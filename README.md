@@ -81,9 +81,54 @@ Examples:
 #### Manual
 Download the latest release from the [releases page](https://github.com/Abdenasser/neohtop/releases).
 
-#### Brew
+#### Package Managers
+
+##### macOS
+
+Using [Homebrew](https://brew.sh/)
+
 ```bash
 brew install --cask neohtop
+```
+
+##### Arch Linux (AUR)
+
+Using the [AUR](https://aur.archlinux.org/) and [an AUR helper](https://wiki.archlinux.org/title/AUR_helpers)
+
+```bash
+yay -S neohtop
+```
+
+or
+
+```bash
+paru -S neohtop
+```
+
+##### Fedora Linux
+Install the [Terra repository](https://terra.fyralabs.com/)
+
+```bash
+dnf install neohtop
+```
+
+##### Windows
+Install the [Scoop repository](https://scoop.sh/), then make sure you have the Scoop extras bucket added:
+
+```bash
+scoop bucket add extras
+```
+
+Then install with
+
+```bash
+scoop install extras/neohtop
+```
+
+##### Solus
+
+```bash
+eopkg install neohtop
 ```
 
 ### Running with Sudo
