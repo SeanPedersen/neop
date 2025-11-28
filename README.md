@@ -83,6 +83,14 @@ Download the latest release from the [releases page](https://github.com/Abdenass
 
 #### Package Managers
 
+Members of the community have kindly published unofficial packages for various platforms and package managers.
+
+Please note, these packages are community-maintained and not officially released, reviewed, or endorsed by NeoHtop.
+We only provide official builds through the GitHub Releases page.
+Since these external packages are managed by third parties, we cannot guarantee their security, integrity, or update frequency.
+
+Please use them at your own discretion.
+
 ##### macOS
 
 Using [Homebrew](https://brew.sh/).
