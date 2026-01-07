@@ -21,6 +21,11 @@ use tauri::Manager;
 /// - Failed to apply window effects
 /// - Failed to initialize the application state
 fn main() {
+    #[cfg(target_os = "linux")]
+    if std::env::var("XDG_SESSION_TYPE").unwrap_or_default() == "wayland" {
+        std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+    }
+
     tauri::Builder::default()
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();
