@@ -94,8 +94,13 @@
 
   $: {
     if (searchTerm || itemsPerPage) {
-      currentPage = 1;
+      processStore.setCurrentPage(1);
     }
+  }
+
+  // Reset to page 1 if current page is beyond total pages
+  $: if (currentPage > totalPages && totalPages > 0) {
+    processStore.setCurrentPage(1);
   }
 
   $: {
