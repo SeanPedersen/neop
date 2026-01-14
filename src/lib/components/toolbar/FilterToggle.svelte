@@ -156,7 +156,6 @@
     aria-label="Toggle filters"
   >
     <Fa icon={faFilter} />
-    Filters
     {#if hasActiveFilters}
       <span class="filter-count">{activeFilterCount}</span>
     {/if}
