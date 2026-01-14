@@ -5,9 +5,16 @@
 
   export let networkRxBytes: number;
   export let networkTxBytes: number;
+  export let onGraphClick: (() => void) | undefined = undefined;
 </script>
 
-<div class="stat-panel">
+<!-- svelte-ignore a11y_click_events_have_key_events -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div
+  class="stat-panel"
+  class:clickable={!!onGraphClick}
+  on:click={onGraphClick}
+>
   <PanelHeader icon={faNetworkWired} title="Network I/O" />
   <div class="network-stats">
     <StatItem label="↓ Receiving" value={formatBytes(networkRxBytes)} />
@@ -24,6 +31,10 @@
     padding: 0.75rem;
     display: flex;
     flex-direction: column;
+  }
+
+  .stat-panel.clickable {
+    cursor: pointer;
   }
 
   .network-stats {

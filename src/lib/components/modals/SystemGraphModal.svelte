@@ -12,6 +12,7 @@
     | "memory"
     | "network_rx"
     | "network_tx"
+    | "network_io"
     | "disk_io"
     | null = null;
   export let memoryTotal: number | undefined = undefined;
@@ -54,6 +55,7 @@
           .slice(0, 10);
         break;
       default:
+        // Network I/O doesn't have process-level data
         topProcesses = [];
     }
   }
@@ -108,6 +110,10 @@
     },
     disk_io: {
       title: "System Disk I/O",
+      showSingle: false,
+    },
+    network_io: {
+      title: "System Network I/O",
       showSingle: false,
     },
   };
@@ -217,6 +223,23 @@
                 metric="disk_io_write_bytes"
                 label="Disk Write"
                 color="var(--maroon)"
+                height={250}
+              />
+            </div>
+          {:else if graphType === "network_io"}
+            <div class="dual-graphs">
+              <TimeSeriesGraph
+                data={historyData}
+                metric="network_rx_bytes"
+                label="Network Receiving"
+                color="var(--lavender)"
+                height={250}
+              />
+              <TimeSeriesGraph
+                data={historyData}
+                metric="network_tx_bytes"
+                label="Network Sending"
+                color="var(--peach)"
                 height={250}
               />
             </div>

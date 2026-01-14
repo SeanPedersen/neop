@@ -21,11 +21,18 @@
     | "memory"
     | "network_rx"
     | "network_tx"
+    | "network_io"
     | "disk_io"
     | null = null;
 
   function openGraph(
-    type: "cpu" | "memory" | "network_rx" | "network_tx" | "disk_io",
+    type:
+      | "cpu"
+      | "memory"
+      | "network_rx"
+      | "network_tx"
+      | "network_io"
+      | "disk_io",
   ) {
     graphType = type;
     showGraphModal = true;
@@ -55,6 +62,7 @@
       <NetworkPanel
         networkRxBytes={systemStats.network_rx_bytes}
         networkTxBytes={systemStats.network_tx_bytes}
+        onGraphClick={() => openGraph("network_io")}
       />
 
       <DiskIOPanel
