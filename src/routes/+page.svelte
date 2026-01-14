@@ -173,6 +173,41 @@
     }
   }
 
+  // Keep selectedProcess updated with live data from processes array
+  // If not found in live processes, check if it's in the accumulator as dead
+  $: liveSelectedProcess = selectedProcess
+    ? (() => {
+        // First try to find in live processes
+        const liveProcess = processes.find(
+          (p) =>
+            p.pid === selectedProcess.pid &&
+            p.start_time === selectedProcess.start_time,
+        );
+
+        if (liveProcess) {
+          return liveProcess;
+        }
+
+        // If not found in live processes, check accumulator for dead process
+        const key = `${selectedProcess.pid}-${selectedProcess.start_time}`;
+        const accumulator = $systemHistoryStore.processAccumulators.get(key);
+
+        if (accumulator && accumulator.status === "Dead") {
+          // Reconstruct dead process from accumulator
+          return {
+            ...selectedProcess,
+            status: "Dead" as const,
+            cpu_usage: 0,
+            memory_usage: accumulator.memoryUsage || 0,
+            threads: 0,
+          };
+        }
+
+        // Fall back to original
+        return selectedProcess;
+      })()
+    : null;
+
   // Reset to page 1 if current page is beyond total pages
   $: if (currentPage > totalPages && totalPages > 0) {
     processStore.setCurrentPage(1);
@@ -258,12 +293,17 @@
 
 <ProcessDetailsModal
   show={showInfoModal}
-  process={selectedProcess}
+  process={liveSelectedProcess}
   {processes}
   processAccumulators={$systemHistoryStore.processAccumulators}
   cpuCoreCount={systemStats?.cpu_usage?.length || 1}
   onClose={processStore.closeProcessDetails}
   onShowDetails={processStore.showProcessDetails}
+  onTogglePin={processStore.togglePin}
+  onKillProcess={processStore.confirmKillProcess}
+  isPinned={liveSelectedProcess
+    ? pinnedProcesses.has(liveSelectedProcess.command)
+    : false}
 />
 
 <KillProcessModal

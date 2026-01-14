@@ -13,6 +13,8 @@
     faCodeFork,
     faTerminal,
     faList,
+    faThumbtack,
+    faXmark,
   } from "@fortawesome/free-solid-svg-icons";
 
   export let show = false;
@@ -23,6 +25,10 @@
     new Map();
   export let onShowDetails: (process: Process) => void;
   export let cpuCoreCount: number = 1;
+  export let onTogglePin: ((command: string) => void) | undefined = undefined;
+  export let onKillProcess: ((process: Process) => void) | undefined =
+    undefined;
+  export let isPinned: boolean = false;
 
   $: isDead = process?.status === "Dead";
   $: childProcesses = process
@@ -236,30 +242,54 @@
           </div>
         {/if}
 
-        <!-- Header Stats -->
-        <div class="header-stats">
-          <div class="stat-item">
-            <div class="stat-label">PID</div>
-            <div class="stat-value">{process.pid}</div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-label">Status</div>
-            <div
-              class="stat-value status"
-              class:running={process.status === "Running"}
-              class:dead={isDead}
-            >
-              {process.status}
+        <!-- Header Stats with Actions -->
+        <div class="header-container">
+          <div class="header-stats">
+            <div class="stat-item">
+              <div class="stat-label">PID</div>
+              <div class="stat-value">{process.pid}</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">Status</div>
+              <div
+                class="stat-value status"
+                class:running={process.status === "Running"}
+                class:dead={isDead}
+              >
+                {process.status}
+              </div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">CPU</div>
+              <div class="stat-value">{process.cpu_usage.toFixed(1)}%</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">Memory</div>
+              <div class="stat-value">{formatBytes(process.memory_usage)}</div>
             </div>
           </div>
-          <div class="stat-item">
-            <div class="stat-label">CPU</div>
-            <div class="stat-value">{process.cpu_usage.toFixed(1)}%</div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-label">Memory</div>
-            <div class="stat-value">{formatBytes(process.memory_usage)}</div>
-          </div>
+
+          {#if !isDead && onTogglePin && onKillProcess}
+            <div class="header-actions">
+              <button
+                class="action-btn pin-btn"
+                class:pinned={isPinned}
+                on:click|stopPropagation={() =>
+                  process && onTogglePin?.(process.command)}
+                title={isPinned ? "Unpin" : "Pin"}
+              >
+                <Fa icon={faThumbtack} />
+              </button>
+              <button
+                class="action-btn kill-btn"
+                on:click|stopPropagation={() =>
+                  process && onKillProcess?.(process)}
+                title="Kill Process"
+              >
+                <Fa icon={faXmark} />
+              </button>
+            </div>
+          {/if}
         </div>
 
         <!-- Resource Usage - Full Width at Top -->
@@ -596,6 +626,13 @@
     font-size: 12px;
   }
 
+  /* Header Container */
+  .header-container {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+
   /* Header Stats */
   .header-stats {
     display: grid;
@@ -604,6 +641,7 @@
     padding: 16px;
     background: var(--surface0);
     border-radius: 8px;
+    flex: 1;
   }
 
   .stat-item {
@@ -633,6 +671,53 @@
 
   .stat-value.status.dead {
     color: var(--red);
+  }
+
+  /* Action Buttons next to Header */
+  .header-actions {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .action-btn {
+    background: transparent;
+    border: 1px solid var(--surface1);
+    color: var(--text);
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .action-btn :global(svg) {
+    display: block;
+    transition: all 0.2s ease;
+  }
+
+  .action-btn:hover {
+    background: var(--surface1);
+    border-color: var(--surface2);
+  }
+
+  /* Pin button styles */
+  .pin-btn.pinned :global(svg) {
+    transform: rotate(45deg);
+  }
+
+  /* Kill button styles */
+  .kill-btn:hover {
+    color: var(--red);
+    background: var(--red);
+    border-color: var(--red);
+  }
+
+  .kill-btn:hover :global(svg) {
+    color: var(--crust);
   }
 
   /* Main Content Grid */

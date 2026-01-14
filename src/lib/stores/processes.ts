@@ -226,6 +226,8 @@ function createProcessStore() {
 
     try {
       await killProcess(processToKill.pid);
+      // Refresh process list immediately after killing
+      await getProcesses();
     } finally {
       update((state) => ({
         ...state,
