@@ -10,9 +10,19 @@
   export let onTogglePin: (command: string) => void;
   export let onShowDetails: (process: Process) => void;
   export let onKillProcess: (process: Process) => void;
+
+  function handleDoubleClick() {
+    onShowDetails(process);
+  }
 </script>
 
-<tr class:high-usage={isHighUsage} class:pinned={isPinned}>
+<!-- svelte-ignore a11y_click_events_have_key_events -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<tr
+  class:high-usage={isHighUsage}
+  class:pinned={isPinned}
+  on:dblclick={handleDoubleClick}
+>
   {#each columns.filter((col) => col.visible) as column}
     <td class="truncate">
       {#if column.id === "name"}
@@ -49,6 +59,10 @@
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 0;
+  }
+
+  tr {
+    cursor: pointer;
   }
 
   tr:hover {
