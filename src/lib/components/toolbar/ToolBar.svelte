@@ -114,7 +114,6 @@
 
 <style>
   .toolbar {
-    padding: 8px;
     border-bottom: 1px solid var(--surface0);
     background-color: var(--mantle);
   }
