@@ -354,7 +354,7 @@
                   </div>
                   <div class="disk-stats">
                     <div>Read: {formatBytes(process.disk_usage[0])}</div>
-                    <div>Written: {formatBytes(process.disk_usage[1])}</div>
+                    <div>Write: {formatBytes(process.disk_usage[1])}</div>
                   </div>
                 </div>
               </div>
