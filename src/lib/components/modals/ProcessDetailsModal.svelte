@@ -19,6 +19,7 @@
   export let onClose: () => void;
   export let processes: Process[] = [];
   export let onShowDetails: (process: Process) => void;
+  export let cpuCoreCount: number = 1;
 
   $: childProcesses = process
     ? processes.filter((p) => p.ppid === process.pid)
@@ -110,9 +111,12 @@
                 <div class="progress-bar">
                   <div
                     class="progress-fill"
-                    style="width: {process.cpu_usage}%"
-                    class:high={process.cpu_usage > 50}
-                    class:critical={process.cpu_usage > 80}
+                    style="width: {Math.min(
+                      (process.cpu_usage / (cpuCoreCount * 100)) * 100,
+                      100,
+                    )}%"
+                    class:high={process.cpu_usage > cpuCoreCount * 50}
+                    class:critical={process.cpu_usage > cpuCoreCount * 80}
                   ></div>
                 </div>
               </div>
@@ -159,7 +163,7 @@
                     label="CPU Usage"
                     color="var(--blue)"
                     height={150}
-                    maxValue={100}
+                    maxValue={cpuCoreCount * 100}
                   />
                 {:else if selectedGraph === "memory"}
                   <TimeSeriesGraph

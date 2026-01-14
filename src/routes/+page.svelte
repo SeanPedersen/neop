@@ -244,6 +244,7 @@
   show={showInfoModal}
   process={selectedProcess}
   {processes}
+  cpuCoreCount={systemStats?.cpu_usage?.length || 1}
   onClose={processStore.closeProcessDetails}
   onShowDetails={processStore.showProcessDetails}
 />
