@@ -477,6 +477,23 @@
                     <span class="info-value">{process.session_id || "N/A"}</span
                     >
                   </div>
+                  <!-- svelte-ignore a11y_no_static_element_interactions -->
+                  <div
+                    class="info-item copyable"
+                    on:contextmenu={(e) =>
+                      handleContextMenu(
+                        e,
+                        new Date(process.start_time * 1000).toLocaleString(),
+                        "info",
+                      )}
+                  >
+                    <span class="info-label">Start Time</span>
+                    <span class="info-value"
+                      >{new Date(
+                        process.start_time * 1000,
+                      ).toLocaleString()}</span
+                    >
+                  </div>
                 </div>
               </div>
             </div>
