@@ -6,7 +6,7 @@ import type {
 } from "$lib/types";
 
 interface ProcessHistoryStore {
-  histories: Map<number, ProcessHistoryDataPoint[]>;
+  histories: Map<string, ProcessHistoryDataPoint[]>; // Key is now "pid-startTime"
 }
 
 const initialState: ProcessHistoryStore = {
@@ -20,13 +20,13 @@ function createProcessHistoryStore() {
   const addDataPoint = (process: Process) => {
     update((state) => {
       const histories = new Map(state.histories);
-      const pid = process.pid;
+      const key = `${process.pid}-${process.start_time}`;
 
-      if (!histories.has(pid)) {
-        histories.set(pid, []);
+      if (!histories.has(key)) {
+        histories.set(key, []);
       }
 
-      const dataPoints = histories.get(pid)!;
+      const dataPoints = histories.get(key)!;
       const newDataPoint: ProcessHistoryDataPoint = {
         timestamp: Date.now(),
         cpu_usage: process.cpu_usage,
@@ -44,24 +44,22 @@ function createProcessHistoryStore() {
   const addDataPoints = (processes: Process[]) => {
     update((state) => {
       const histories = new Map(state.histories);
-      const currentPids = new Set(processes.map((p) => p.pid));
+      const currentKeys = new Set(
+        processes.map((p) => `${p.pid}-${p.start_time}`),
+      );
 
-      // Remove histories for processes that no longer exist
-      for (const pid of histories.keys()) {
-        if (!currentPids.has(pid)) {
-          histories.delete(pid);
-        }
-      }
+      // Don't remove histories for dead processes anymore - keep them for historical view
+      // Only remove very old histories (optional: could add cleanup after X hours)
 
       // Add data points for all current processes
       processes.forEach((process) => {
-        const pid = process.pid;
+        const key = `${process.pid}-${process.start_time}`;
 
-        if (!histories.has(pid)) {
-          histories.set(pid, []);
+        if (!histories.has(key)) {
+          histories.set(key, []);
         }
 
-        const dataPoints = histories.get(pid)!;
+        const dataPoints = histories.get(key)!;
         const newDataPoint: ProcessHistoryDataPoint = {
           timestamp: Date.now(),
           cpu_usage: process.cpu_usage,
@@ -77,19 +75,24 @@ function createProcessHistoryStore() {
     });
   };
 
-  const getHistory = (pid: number): ProcessHistoryDataPoint[] => {
+  const getHistory = (
+    pid: number,
+    startTime: number,
+  ): ProcessHistoryDataPoint[] => {
     let history: ProcessHistoryDataPoint[] = [];
+    const key = `${pid}-${startTime}`;
     const unsubscribe = subscribe((state) => {
-      history = state.histories.get(pid) || [];
+      history = state.histories.get(key) || [];
     });
     unsubscribe();
     return history;
   };
 
-  const clearHistory = (pid: number) => {
+  const clearHistory = (pid: number, startTime: number) => {
     update((state) => {
       const histories = new Map(state.histories);
-      histories.delete(pid);
+      const key = `${pid}-${startTime}`;
+      histories.delete(key);
       return { ...state, histories };
     });
   };

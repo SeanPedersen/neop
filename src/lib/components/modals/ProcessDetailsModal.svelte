@@ -21,13 +21,16 @@
   export let onShowDetails: (process: Process) => void;
   export let cpuCoreCount: number = 1;
 
+  $: isDead = process?.status === "Dead";
   $: childProcesses = process
     ? processes.filter((p) => p.ppid === process.pid)
     : [];
 
   // Create a derived store that gets the history for the current process
   $: historyStore = derived(processHistoryStore, ($store) => {
-    return process ? $store.histories.get(process.pid) || [] : [];
+    return process
+      ? $store.histories.get(`${process.pid}-${process.start_time}`) || []
+      : [];
   });
 
   $: historyData = $historyStore;
@@ -93,7 +96,7 @@
 
 <Modal
   {show}
-  title={`${process ? process.name : "Unknown Process"} - Process Details`}
+  title={`${process ? process.name : "Unknown Process"} - Process Details${isDead ? " (Dead)" : ""}`}
   maxWidth="1000px"
   {onClose}
 >
@@ -102,6 +105,19 @@
   <div on:click={handleClickOutside}>
     {#if process}
       <div class="modal-content">
+        <!-- Dead Process Warning Banner -->
+        {#if isDead}
+          <div class="dead-banner">
+            <span class="dead-icon">⚠️</span>
+            <div class="dead-text">
+              <strong>This process is no longer running.</strong>
+              <span
+                >Showing historical information from when it was active.</span
+              >
+            </div>
+          </div>
+        {/if}
+
         <!-- Header Stats -->
         <div class="header-stats">
           <div class="stat-item">
@@ -113,6 +129,7 @@
             <div
               class="stat-value status"
               class:running={process.status === "Running"}
+              class:dead={isDead}
             >
               {process.status}
             </div>
@@ -259,15 +276,17 @@
                     <span class="info-label">Name</span>
                     <span class="info-value">{process.name}</span>
                   </div>
-                  <!-- svelte-ignore a11y_no_static_element_interactions -->
-                  <div
-                    class="info-item copyable"
-                    on:contextmenu={(e) =>
-                      handleContextMenu(e, process.user, "info")}
-                  >
-                    <span class="info-label">User</span>
-                    <span class="info-value">{process.user}</span>
-                  </div>
+                  {#if process.user}
+                    <!-- svelte-ignore a11y_no_static_element_interactions -->
+                    <div
+                      class="info-item copyable"
+                      on:contextmenu={(e) =>
+                        handleContextMenu(e, process.user, "info")}
+                    >
+                      <span class="info-label">User</span>
+                      <span class="info-value">{process.user}</span>
+                    </div>
+                  {/if}
                   <!-- svelte-ignore a11y_no_static_element_interactions -->
                   <div
                     class="info-item copyable"
@@ -275,19 +294,23 @@
                       handleContextMenu(e, process.ppid.toString(), "info")}
                   >
                     <span class="info-label">Parent PID</span>
-                    <!-- svelte-ignore a11y_click_events_have_key_events -->
-                    <!-- svelte-ignore a11y_no_static_element_interactions -->
-                    <span
-                      class="info-value clickable"
-                      on:click={() => {
-                        const parent = processes.find(
-                          (p) => p.pid === process.ppid,
-                        );
-                        if (parent) onShowDetails(parent);
-                      }}
-                    >
-                      {process.ppid}
-                    </span>
+                    {#if process.ppid === 0}
+                      <span class="info-value">N/A</span>
+                    {:else}
+                      <!-- svelte-ignore a11y_click_events_have_key_events -->
+                      <!-- svelte-ignore a11y_no_static_element_interactions -->
+                      <span
+                        class="info-value clickable"
+                        on:click={() => {
+                          const parent = processes.find(
+                            (p) => p.pid === process.ppid,
+                          );
+                          if (parent) onShowDetails(parent);
+                        }}
+                      >
+                        {process.ppid}
+                      </span>
+                    {/if}
                   </div>
                   <!-- svelte-ignore a11y_no_static_element_interactions -->
                   <div
@@ -295,12 +318,13 @@
                     on:contextmenu={(e) =>
                       handleContextMenu(
                         e,
-                        process.session_id.toString(),
+                        process.session_id?.toString() || "0",
                         "info",
                       )}
                   >
                     <span class="info-label">Session ID</span>
-                    <span class="info-value">{process.session_id}</span>
+                    <span class="info-value">{process.session_id || "N/A"}</span
+                    >
                   </div>
                 </div>
               </div>
@@ -417,6 +441,40 @@
     color: var(--text);
   }
 
+  /* Dead Process Banner */
+  .dead-banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: rgba(243, 139, 168, 0.15);
+    border: 1px solid var(--red);
+    border-radius: 8px;
+    color: var(--text);
+  }
+
+  .dead-icon {
+    font-size: 20px;
+    line-height: 1;
+  }
+
+  .dead-text {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
+  }
+
+  .dead-text strong {
+    color: var(--red);
+    font-weight: 600;
+  }
+
+  .dead-text span {
+    color: var(--subtext0);
+    font-size: 12px;
+  }
+
   /* Header Stats */
   .header-stats {
     display: grid;
@@ -450,6 +508,10 @@
 
   .stat-value.status.running {
     color: var(--green);
+  }
+
+  .stat-value.status.dead {
+    color: var(--red);
   }
 
   /* Main Content Grid */

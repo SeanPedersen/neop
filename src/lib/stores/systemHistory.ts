@@ -14,17 +14,21 @@ export interface SystemHistoryDataPoint {
 export interface ProcessResourceAccumulator {
   pid: number;
   name: string;
+  command: string;
+  user: string;
+  startTime: number;
   totalCpuUsage: number;
   maxMemoryUsage: number;
   totalDiskRead: number;
   totalDiskWrite: number;
   sampleCount: number;
   lastSeen: number;
+  status: string;
 }
 
 interface SystemHistoryStore {
   dataPoints: SystemHistoryDataPoint[];
-  processAccumulators: Map<number, ProcessResourceAccumulator>;
+  processAccumulators: Map<string, ProcessResourceAccumulator>; // Key is now "pid-startTime"
 }
 
 const initialState: SystemHistoryStore = {
@@ -57,9 +61,13 @@ function createSystemHistoryStore() {
       // Update process accumulators
       const processAccumulators = new Map(state.processAccumulators);
       const now = Date.now();
+      const currentProcessKeys = new Set<string>();
 
       processes.forEach((process) => {
-        const existing = processAccumulators.get(process.pid);
+        const key = `${process.pid}-${process.start_time}`;
+        currentProcessKeys.add(key);
+
+        const existing = processAccumulators.get(key);
         if (existing) {
           existing.totalCpuUsage += process.cpu_usage;
           existing.maxMemoryUsage = Math.max(
@@ -70,17 +78,29 @@ function createSystemHistoryStore() {
           existing.totalDiskWrite += process.disk_usage[1];
           existing.sampleCount += 1;
           existing.lastSeen = now;
+          existing.status = process.status;
         } else {
-          processAccumulators.set(process.pid, {
+          processAccumulators.set(key, {
             pid: process.pid,
             name: process.name,
+            command: process.command,
+            user: process.user,
+            startTime: process.start_time,
             totalCpuUsage: process.cpu_usage,
             maxMemoryUsage: process.memory_usage,
             totalDiskRead: process.disk_usage[0],
             totalDiskWrite: process.disk_usage[1],
             sampleCount: 1,
             lastSeen: now,
+            status: process.status,
           });
+        }
+      });
+
+      // Mark processes that are no longer in the current process list as "Dead"
+      processAccumulators.forEach((accumulator, key) => {
+        if (!currentProcessKeys.has(key)) {
+          accumulator.status = "Dead";
         }
       });
 

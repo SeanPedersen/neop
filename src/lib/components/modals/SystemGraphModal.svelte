@@ -3,6 +3,7 @@
   import TimeSeriesGraph from "$lib/components/stats/TimeSeriesGraph.svelte";
   import { systemHistoryStore } from "$lib/stores/systemHistory";
   import type { ProcessResourceAccumulator } from "$lib/stores/systemHistory";
+  import type { Process } from "$lib/types";
 
   export let show = false;
   export let onClose: () => void;
@@ -14,6 +15,9 @@
     | "disk_io"
     | null = null;
   export let memoryTotal: number | undefined = undefined;
+  export let currentProcesses: Process[] = [];
+  export let onProcessClick: ((process: Process) => void) | undefined =
+    undefined;
 
   $: historyData = $systemHistoryStore.dataPoints;
 
@@ -145,6 +149,44 @@
         return "";
     }
   }
+
+  function isProcessAlive(proc: ProcessResourceAccumulator): boolean {
+    return proc.status !== "Dead";
+  }
+
+  function handleProcessClick(proc: ProcessResourceAccumulator) {
+    if (!onProcessClick) return;
+
+    // Try to find the process in the current process list
+    const liveProcess = currentProcesses.find(
+      (p) => p.pid === proc.pid && p.start_time === proc.startTime,
+    );
+
+    if (liveProcess) {
+      onProcessClick(liveProcess);
+    } else {
+      // Create a dead process object for display with saved information
+      const deadProcess: Process = {
+        pid: proc.pid,
+        ppid: 0,
+        name: proc.name,
+        cpu_usage: 0,
+        memory_usage: 0,
+        status: "Dead",
+        user: proc.user,
+        command: proc.command,
+        threads: 0,
+        environ: [],
+        root: "",
+        virtual_memory: 0,
+        start_time: proc.startTime,
+        run_time: 0,
+        disk_usage: [0, 0],
+        session_id: 0,
+      };
+      onProcessClick(deadProcess);
+    }
+  }
 </script>
 
 <Modal {show} title={currentConfig?.title || "System Graph"} {onClose}>
@@ -186,10 +228,21 @@
             <h3>Top 10 Resource Hogs</h3>
             <div class="process-list">
               {#each topProcesses as proc, index}
-                <div class="process-item">
+                <button
+                  class="process-item"
+                  class:clickable={onProcessClick !== undefined}
+                  class:dead={!isProcessAlive(proc)}
+                  on:click={() => handleProcessClick(proc)}
+                  type="button"
+                >
                   <div class="process-rank">#{index + 1}</div>
                   <div class="process-info">
-                    <div class="process-name">{proc.name}</div>
+                    <div class="process-name">
+                      {proc.name}
+                      {#if !isProcessAlive(proc)}
+                        <span class="dead-badge">Dead</span>
+                      {/if}
+                    </div>
                     <div class="process-stats">
                       <span class="process-pid">PID: {proc.pid}</span>
                       <span class="process-value"
@@ -197,7 +250,7 @@
                       >
                     </div>
                   </div>
-                </div>
+                </button>
               {/each}
             </div>
           </div>
@@ -263,10 +316,25 @@
     border-radius: 6px;
     align-items: center;
     transition: background 0.2s ease;
+    border: none;
+    width: 100%;
+    text-align: left;
   }
 
-  .process-item:hover {
+  .process-item.clickable {
+    cursor: pointer;
+  }
+
+  .process-item.clickable:hover {
     background: var(--surface1);
+  }
+
+  .process-item.dead {
+    opacity: 0.7;
+  }
+
+  .process-item.dead .process-name {
+    color: var(--subtext0);
   }
 
   .process-rank {
@@ -291,6 +359,20 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .dead-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--red);
+    background: rgba(243, 139, 168, 0.2);
+    border-radius: 4px;
+    text-transform: uppercase;
   }
 
   .process-stats {

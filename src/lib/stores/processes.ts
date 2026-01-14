@@ -74,8 +74,14 @@ function createProcessStore() {
       update((state) => {
         let updatedSelectedProcess = state.selectedProcess;
         if (state.selectedProcessPid) {
-          updatedSelectedProcess =
-            result[0].find((p) => p.pid === state.selectedProcessPid) || null;
+          const foundProcess = result[0].find(
+            (p) => p.pid === state.selectedProcessPid,
+          );
+          // Only update if we find the process (it's alive)
+          // Keep the old selectedProcess if not found (it's dead)
+          if (foundProcess) {
+            updatedSelectedProcess = foundProcess;
+          }
         }
 
         // Add data points to history store

@@ -9,8 +9,11 @@
     DiskIOPanel,
   } from "$lib/components";
   import SystemGraphModal from "$lib/components/modals/SystemGraphModal.svelte";
+  import { processStore } from "$lib/stores/processes";
 
   export let systemStats: SystemStats | null = null;
+
+  $: processes = $processStore.processes;
 
   let showGraphModal = false;
   let graphType:
@@ -76,6 +79,8 @@
   {graphType}
   onClose={closeGraph}
   memoryTotal={systemStats?.memory_total}
+  currentProcesses={processes}
+  onProcessClick={processStore.showProcessDetails}
 />
 
 <style>
