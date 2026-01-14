@@ -110,6 +110,10 @@ pub struct SystemStats {
     pub network_rx_bytes: u64,
     /// Total bytes transmitted over network
     pub network_tx_bytes: u64,
+    /// Disk I/O read rate in bytes per second
+    pub disk_io_read_bytes: u64,
+    /// Disk I/O write rate in bytes per second
+    pub disk_io_write_bytes: u64,
     /// Total disk space in bytes
     pub disk_total_bytes: u64,
     /// Used disk space in bytes

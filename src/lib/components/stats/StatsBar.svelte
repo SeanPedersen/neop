@@ -6,6 +6,7 @@
     StoragePanel,
     SystemPanel,
     NetworkPanel,
+    DiskIOPanel,
   } from "$lib/components";
 
   export let systemStats: SystemStats | null = null;
@@ -22,6 +23,16 @@
         memoryFree={systemStats.memory_free}
       />
 
+      <NetworkPanel
+        networkRxBytes={systemStats.network_rx_bytes}
+        networkTxBytes={systemStats.network_tx_bytes}
+      />
+
+      <DiskIOPanel
+        diskIoReadBytes={systemStats.disk_io_read_bytes}
+        diskIoWriteBytes={systemStats.disk_io_write_bytes}
+      />
+
       <StoragePanel
         diskTotalBytes={systemStats.disk_total_bytes}
         diskUsedBytes={systemStats.disk_used_bytes}
@@ -29,11 +40,6 @@
       />
 
       <SystemPanel uptime={systemStats.uptime} loadAvg={systemStats.load_avg} />
-
-      <NetworkPanel
-        networkRxBytes={systemStats.network_rx_bytes}
-        networkTxBytes={systemStats.network_tx_bytes}
-      />
     </div>
   {/if}
 </div>

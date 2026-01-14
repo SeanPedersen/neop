@@ -28,6 +28,8 @@ export interface SystemStats {
   load_avg: [number, number, number];
   network_rx_bytes: number;
   network_tx_bytes: number;
+  disk_io_read_bytes: number;
+  disk_io_write_bytes: number;
   disk_total_bytes: number;
   disk_used_bytes: number;
   disk_free_bytes: number;

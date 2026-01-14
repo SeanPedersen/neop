@@ -14,6 +14,8 @@ use sysinfo::{Disk, Disks, Networks, System};
 pub struct SystemMonitor {
     /// Tracks network usage between updates
     last_network_update: (Instant, u64, u64),
+    /// Tracks disk I/O between updates (instant, read_bytes, written_bytes)
+    last_disk_io_update: (Instant, u64, u64),
 }
 
 impl SystemMonitor {
@@ -35,6 +37,7 @@ impl SystemMonitor {
 
         Self {
             last_network_update: (Instant::now(), initial_rx, initial_tx),
+            last_disk_io_update: (Instant::now(), 0, 0),
         }
     }
 
@@ -50,6 +53,7 @@ impl SystemMonitor {
         disks: &Disks,
     ) -> SystemStats {
         let (network_rx, network_tx) = self.calculate_network_stats(networks);
+        let (disk_io_read, disk_io_write) = self.calculate_disk_io_stats(sys);
         let (disk_total, disk_used, disk_free) = self.calculate_disk_stats(disks);
         let load_average = System::load_average();
 
@@ -64,6 +68,8 @@ impl SystemMonitor {
             load_avg: [load_average.one, load_average.five, load_average.fifteen],
             network_rx_bytes: network_rx,
             network_tx_bytes: network_tx,
+            disk_io_read_bytes: disk_io_read,
+            disk_io_write_bytes: disk_io_write,
             disk_total_bytes: disk_total,
             disk_used_bytes: disk_used,
             disk_free_bytes: disk_free,
@@ -102,6 +108,38 @@ impl SystemMonitor {
 
         self.last_network_update = (Instant::now(), current_rx, current_tx);
         (rx_rate, tx_rate)
+    }
+
+    /// Calculates disk I/O rates by aggregating all process disk usage
+    fn calculate_disk_io_stats(&mut self, sys: &System) -> (u64, u64) {
+        let (current_read, current_write) =
+            sys.processes()
+                .values()
+                .fold((0, 0), |(total_read, total_write), process| {
+                    let disk_usage = process.disk_usage();
+                    (
+                        total_read + disk_usage.total_read_bytes,
+                        total_write + disk_usage.total_written_bytes,
+                    )
+                });
+
+        let elapsed = self.last_disk_io_update.0.elapsed().as_secs_f64();
+
+        // Handle potential counter resets or overflow by checking if current values are less than previous
+        let read_rate = if elapsed > 0.0 && current_read >= self.last_disk_io_update.1 {
+            ((current_read - self.last_disk_io_update.1) as f64 / elapsed) as u64
+        } else {
+            0
+        };
+
+        let write_rate = if elapsed > 0.0 && current_write >= self.last_disk_io_update.2 {
+            ((current_write - self.last_disk_io_update.2) as f64 / elapsed) as u64
+        } else {
+            0
+        };
+
+        self.last_disk_io_update = (Instant::now(), current_read, current_write);
+        (read_rate, write_rate)
     }
 
     /// Calculates disk usage statistics and returns `(total, used, free)`.
