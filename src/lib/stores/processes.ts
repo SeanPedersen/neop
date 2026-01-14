@@ -66,8 +66,8 @@ function createProcessStore() {
         // Add data points to history store
         processHistoryStore.addDataPoints(result[0]);
 
-        // Add system stats to history store
-        systemHistoryStore.addDataPoint(result[1]);
+        // Add system stats to history store with process data
+        systemHistoryStore.addDataPoint(result[1], result[0]);
 
         return {
           ...state,
