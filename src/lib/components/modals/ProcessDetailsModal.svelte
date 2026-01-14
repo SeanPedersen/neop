@@ -54,7 +54,7 @@
 
 <Modal
   {show}
-  title={`${process ? process.name.slice(0, 10) : "Unknown Process"} - Process Details`}
+  title={`${process ? process.name : "Unknown Process"} - Process Details`}
   maxWidth="1000px"
   {onClose}
 >
