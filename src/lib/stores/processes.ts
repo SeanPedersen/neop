@@ -69,9 +69,25 @@ function createProcessStore() {
         // Add system stats to history store with process data
         systemHistoryStore.addDataPoint(result[1], result[0]);
 
+        // Maintain array reference stability for scroll preservation
+        const newProcesses = result[0];
+        let processArray = state.processes;
+
+        if (state.processes.length === newProcesses.length) {
+          // Same count - update in place to preserve reference
+          for (let i = 0; i < newProcesses.length; i++) {
+            state.processes[i] = newProcesses[i];
+          }
+          // Return same array reference
+          processArray = state.processes;
+        } else {
+          // Count changed - use new array
+          processArray = newProcesses;
+        }
+
         return {
           ...state,
-          processes: result[0],
+          processes: processArray,
           systemStats: result[1],
           error: null,
           selectedProcess: updatedSelectedProcess,

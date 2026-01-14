@@ -35,6 +35,7 @@
   let lastProcessCount = 0;
   let cachedFilteredProcesses: Process[] = [];
   let cachedSortedProcesses: Process[] = [];
+  let paginatedProcesses: Process[] = [];
 
   // Initialize filters object for the new FilterToggle
   let filters = {
@@ -54,43 +55,105 @@
   $: refreshRate = $settingsStore.behavior.refreshRate;
 
   // Throttled filtering to reduce CPU usage
+  let lastFilterTerm = "";
+  let lastFilterState = JSON.stringify(filters);
+
   const debouncedFilter = debounce(() => {
-    cachedFilteredProcesses = filterProcesses(processes, searchTerm, filters);
+    const hasFilters = Object.values(filters).some((f) => f.enabled);
+    if (hasFilters || searchTerm) {
+      cachedFilteredProcesses = filterProcesses(processes, searchTerm, filters);
+    } else {
+      cachedFilteredProcesses = processes;
+    }
   }, 100);
 
-  // Only recalculate filtering when inputs actually change
-  $: if (
-    processes.length !== lastProcessCount ||
-    searchTerm ||
-    Object.values(filters).some((f) => f.enabled)
-  ) {
-    lastProcessCount = processes.length;
-    debouncedFilter();
-  } else if (
-    processes.length === lastProcessCount &&
-    !searchTerm &&
-    !Object.values(filters).some((f) => f.enabled)
-  ) {
-    // No filters applied, use all processes directly
-    cachedFilteredProcesses = processes;
+  // Only recalculate filtering when search term or filters actually change
+  $: {
+    const filterStateChanged =
+      lastFilterTerm !== searchTerm ||
+      lastFilterState !== JSON.stringify(filters);
+    const countChanged = processes.length !== lastProcessCount;
+
+    if (filterStateChanged || countChanged) {
+      lastProcessCount = processes.length;
+      lastFilterTerm = searchTerm;
+      lastFilterState = JSON.stringify(filters);
+      debouncedFilter();
+    } else if (!searchTerm && !Object.values(filters).some((f) => f.enabled)) {
+      // No filters - reuse the same reference if already set to processes
+      if (cachedFilteredProcesses !== processes) {
+        cachedFilteredProcesses = processes;
+      }
+    }
   }
 
-  // Cache sorted results to avoid re-sorting unchanged data
-  $: if (cachedFilteredProcesses && (sortConfig || pinnedProcesses.size > 0)) {
-    cachedSortedProcesses = sortProcesses(
-      cachedFilteredProcesses,
-      sortConfig,
-      pinnedProcesses,
-    );
-  } else {
-    cachedSortedProcesses = cachedFilteredProcesses;
+  // Cache sorted results - only re-sort when sort config or filtered list changes
+  let lastSortField: keyof Process | null = null;
+  let lastSortDirection: "asc" | "desc" | null = null;
+  let lastPinnedSize = 0;
+  let lastProcessesCount = 0;
+
+  $: if (sortConfig && cachedFilteredProcesses.length > 0) {
+    const sortChanged =
+      lastSortField !== sortConfig.field ||
+      lastSortDirection !== sortConfig.direction;
+    const pinnedChanged = lastPinnedSize !== pinnedProcesses.size;
+    const countChanged = lastProcessesCount !== cachedFilteredProcesses.length;
+    const isInitialLoad = lastSortField === null;
+
+    // Only re-sort when configuration changes or process count changes, not on every stat update
+    if (sortChanged || pinnedChanged || countChanged || isInitialLoad) {
+      lastSortField = sortConfig.field;
+      lastSortDirection = sortConfig.direction;
+      lastPinnedSize = pinnedProcesses.size;
+      lastProcessesCount = cachedFilteredProcesses.length;
+
+      cachedSortedProcesses = sortProcesses(
+        cachedFilteredProcesses,
+        sortConfig,
+        pinnedProcesses,
+      );
+    }
   }
 
   $: totalPages = Math.ceil(cachedFilteredProcesses.length / itemsPerPage);
-  $: paginatedProcesses = cachedSortedProcesses.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage,
-  );
+
+  // Track pagination parameters
+  let lastPage = currentPage;
+  let lastItemsPerPage = itemsPerPage;
+  let lastSortedLength = 0;
+
+  $: {
+    const pageChanged = lastPage !== currentPage;
+    const itemsPerPageChanged = lastItemsPerPage !== itemsPerPage;
+    const needsNewSlice = pageChanged || itemsPerPageChanged;
+
+    if (needsNewSlice || paginatedProcesses.length === 0) {
+      lastPage = currentPage;
+      lastItemsPerPage = itemsPerPage;
+      lastSortedLength = cachedSortedProcesses.length;
+
+      paginatedProcesses = cachedSortedProcesses.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage,
+      );
+    } else {
+      // Update existing array in place - this preserves the reference
+      const start = (currentPage - 1) * itemsPerPage;
+      const end = start + itemsPerPage;
+      const newSlice = cachedSortedProcesses.slice(start, end);
+
+      // Adjust array length if needed
+      paginatedProcesses.length = newSlice.length;
+
+      // Update all items
+      for (let i = 0; i < newSlice.length; i++) {
+        paginatedProcesses[i] = newSlice[i];
+      }
+
+      lastSortedLength = cachedSortedProcesses.length;
+    }
+  }
 
   $: {
     if (searchTerm || itemsPerPage) {
