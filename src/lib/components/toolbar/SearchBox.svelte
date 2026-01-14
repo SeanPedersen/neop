@@ -9,6 +9,7 @@
   let searchInputElement: HTMLInputElement;
   let placeholderIndex = 0;
   let placeholderInterval: NodeJS.Timeout;
+  let isInputFocused = false;
 
   $: showHelp = $overlayStore === "searchHelp";
   $: hasActiveSearch = searchTerm.trim().length > 0;
@@ -69,6 +70,19 @@
     placeholderIndex = (placeholderIndex + 1) % placeholders.length;
   }
 
+  function startPlaceholderRotation() {
+    if (placeholderInterval) {
+      clearInterval(placeholderInterval);
+    }
+    placeholderInterval = setInterval(rotatePlaceholder, 3000);
+  }
+
+  function stopPlaceholderRotation() {
+    if (placeholderInterval) {
+      clearInterval(placeholderInterval);
+    }
+  }
+
   function updateOverlayPosition() {
     if (overlayElement && containerElement) {
       const toolbarContent = containerElement.closest(".toolbar-content");
@@ -88,6 +102,8 @@
   }
 
   function handleFocus() {
+    isInputFocused = true;
+    startPlaceholderRotation();
     overlayStore.open("searchHelp");
     setTimeout(() => {
       updateOverlayPosition();
@@ -106,6 +122,9 @@
     setTimeout(() => {
       const activeElement = document.activeElement;
       if (!containerElement?.contains(activeElement as Node)) {
+        isInputFocused = false;
+        stopPlaceholderRotation();
+        placeholderIndex = 0; // Reset to "Search processes..."
         overlayStore.close();
       }
     }, 150);
@@ -155,8 +174,8 @@
   }
 
   onMount(() => {
-    // Start placeholder rotation
-    placeholderInterval = setInterval(rotatePlaceholder, 3000);
+    // Don't start placeholder rotation on mount
+    // It will only start when the input is focused
   });
 
   onDestroy(() => {
