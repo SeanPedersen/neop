@@ -25,6 +25,24 @@ interface ProcessStore {
   };
 }
 
+// Load sort config from localStorage if available
+function getInitialSortConfig() {
+  if (typeof window !== "undefined") {
+    const stored = localStorage.getItem("neohtop_sortConfig");
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch (e) {
+        console.error("Failed to parse stored sortConfig:", e);
+      }
+    }
+  }
+  return {
+    field: "cpu_usage" as keyof Process,
+    direction: "desc" as "asc" | "desc",
+  };
+}
+
 const initialState: ProcessStore = {
   processes: [],
   systemStats: null,
@@ -40,10 +58,7 @@ const initialState: ProcessStore = {
   isKilling: false,
   isFrozen: false,
   selectedProcessPid: null,
-  sortConfig: {
-    field: "cpu_usage",
-    direction: "desc",
-  },
+  sortConfig: getInitialSortConfig(),
 };
 
 function createProcessStore() {
@@ -69,25 +84,9 @@ function createProcessStore() {
         // Add system stats to history store with process data
         systemHistoryStore.addDataPoint(result[1], result[0]);
 
-        // Maintain array reference stability for scroll preservation
-        const newProcesses = result[0];
-        let processArray = state.processes;
-
-        if (state.processes.length === newProcesses.length) {
-          // Same count - update in place to preserve reference
-          for (let i = 0; i < newProcesses.length; i++) {
-            state.processes[i] = newProcesses[i];
-          }
-          // Return same array reference
-          processArray = state.processes;
-        } else {
-          // Count changed - use new array
-          processArray = newProcesses;
-        }
-
         return {
           ...state,
-          processes: processArray,
+          processes: result[0],
           systemStats: result[1],
           error: null,
           selectedProcess: updatedSelectedProcess,
@@ -121,9 +120,8 @@ function createProcessStore() {
   };
 
   const toggleSort = (field: keyof Process) => {
-    update((state) => ({
-      ...state,
-      sortConfig: {
+    update((state) => {
+      const newSortConfig = {
         field,
         direction:
           state.sortConfig.field === field
@@ -131,8 +129,21 @@ function createProcessStore() {
               ? "desc"
               : "asc"
             : "desc",
-      },
-    }));
+      } as { field: keyof Process; direction: "asc" | "desc" };
+
+      // Persist to localStorage
+      if (typeof window !== "undefined") {
+        localStorage.setItem(
+          "neohtop_sortConfig",
+          JSON.stringify(newSortConfig),
+        );
+      }
+
+      return {
+        ...state,
+        sortConfig: newSortConfig,
+      };
+    });
   };
 
   const togglePin = (command: string) => {

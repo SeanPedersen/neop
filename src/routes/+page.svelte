@@ -73,13 +73,22 @@
       lastFilterTerm !== searchTerm ||
       lastFilterState !== JSON.stringify(filters);
     const countChanged = processes.length !== lastProcessCount;
+    const hasFilters = Object.values(filters).some((f) => f.enabled);
+    const hasSearchTerm = searchTerm.length > 0;
 
     if (filterStateChanged || countChanged) {
       lastProcessCount = processes.length;
       lastFilterTerm = searchTerm;
       lastFilterState = JSON.stringify(filters);
-      debouncedFilter();
-    } else if (!searchTerm && !Object.values(filters).some((f) => f.enabled)) {
+
+      // Skip debounce on initial load when there are no filters
+      if (!hasFilters && !hasSearchTerm) {
+        cachedFilteredProcesses = processes;
+        console.log("[Filter] Immediate filter, processes:", processes.length);
+      } else {
+        debouncedFilter();
+      }
+    } else if (!hasSearchTerm && !hasFilters) {
       // No filters - reuse the same reference if already set to processes
       if (cachedFilteredProcesses !== processes) {
         cachedFilteredProcesses = processes;
@@ -87,32 +96,26 @@
     }
   }
 
-  // Cache sorted results - only re-sort when sort config or filtered list changes
-  let lastSortField: keyof Process | null = null;
-  let lastSortDirection: "asc" | "desc" | null = null;
-  let lastPinnedSize = 0;
-  let lastProcessesCount = 0;
-
-  $: if (sortConfig && cachedFilteredProcesses.length > 0) {
-    const sortChanged =
-      lastSortField !== sortConfig.field ||
-      lastSortDirection !== sortConfig.direction;
-    const pinnedChanged = lastPinnedSize !== pinnedProcesses.size;
-    const countChanged = lastProcessesCount !== cachedFilteredProcesses.length;
-    const isInitialLoad = lastSortField === null;
-
-    // Only re-sort when configuration changes or process count changes, not on every stat update
-    if (sortChanged || pinnedChanged || countChanged || isInitialLoad) {
-      lastSortField = sortConfig.field;
-      lastSortDirection = sortConfig.direction;
-      lastPinnedSize = pinnedProcesses.size;
-      lastProcessesCount = cachedFilteredProcesses.length;
-
+  // Cache sorted results - re-sort when cachedFilteredProcesses changes
+  $: {
+    // Always sort when we have processes and sortConfig
+    // This will trigger whenever cachedFilteredProcesses changes (new reference)
+    if (sortConfig && cachedFilteredProcesses.length > 0) {
       cachedSortedProcesses = sortProcesses(
         cachedFilteredProcesses,
         sortConfig,
         pinnedProcesses,
       );
+      console.log(
+        "[Sort] Sorted processes:",
+        cachedSortedProcesses.length,
+        "by",
+        sortConfig.field,
+        sortConfig.direction,
+      );
+    } else if (cachedFilteredProcesses.length === 0) {
+      // Clear sorted list when there are no filtered processes
+      cachedSortedProcesses = [];
     }
   }
 
@@ -137,11 +140,45 @@
         (currentPage - 1) * itemsPerPage,
         currentPage * itemsPerPage,
       );
+
+      console.log(
+        "[Paginate] New slice, paginated:",
+        paginatedProcesses.length,
+        "from",
+        cachedSortedProcesses.length,
+        "currentPage:",
+        currentPage,
+        "itemsPerPage:",
+        itemsPerPage,
+      );
+      if (paginatedProcesses.length > 0) {
+        console.log(
+          "[Paginate] First 3 processes CPU:",
+          paginatedProcesses[0]?.cpu_usage,
+          paginatedProcesses[1]?.cpu_usage,
+          paginatedProcesses[2]?.cpu_usage,
+        );
+      }
     } else {
       // Update existing array in place - this preserves the reference
       const start = (currentPage - 1) * itemsPerPage;
       const end = start + itemsPerPage;
       const newSlice = cachedSortedProcesses.slice(start, end);
+
+      console.log(
+        "[Paginate] In-place update, from",
+        paginatedProcesses.length,
+        "to",
+        newSlice.length,
+      );
+      if (newSlice.length > 0) {
+        console.log(
+          "[Paginate] In-place first 3 CPU:",
+          newSlice[0]?.cpu_usage,
+          newSlice[1]?.cpu_usage,
+          newSlice[2]?.cpu_usage,
+        );
+      }
 
       // Adjust array length if needed
       paginatedProcesses.length = newSlice.length;
@@ -169,25 +206,32 @@
   $: {
     if (intervalId) clearInterval(intervalId);
     if (!isFrozen) {
-      // Use adaptive refresh rate - slightly slower for 1s to reduce CPU usage
-      const adaptiveRefreshRate = refreshRate === 1000 ? 1500 : refreshRate;
       intervalId = setInterval(() => {
         processStore.getProcesses();
-      }, adaptiveRefreshRate);
+      }, refreshRate);
     }
   }
 
   onMount(async () => {
+    // Initialize settings FIRST so itemsPerPage and other configs are ready
+    settingsStore.init();
+    themeStore.init();
+
     try {
+      // First fetch - will have 0% CPU for all processes
       await processStore.getProcesses();
+      console.log("[Mount] First fetch complete");
+
+      // Wait 100ms then fetch again to get real CPU values
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      await processStore.getProcesses();
+      console.log("[Mount] Second fetch complete with real CPU data");
     } catch (error) {
       console.error("Failed to load processes:", error);
     } finally {
       processStore.setIsLoading(false);
+      console.log("[Mount] isLoading = false, showing UI");
     }
-
-    settingsStore.init();
-    themeStore.init();
   });
 
   onDestroy(() => {
