@@ -36,6 +36,14 @@
     null;
   let lastOpenedProcess: number | null = null;
 
+  // Context menu state
+  let contextMenu = {
+    show: false,
+    x: 0,
+    y: 0,
+    text: "",
+  };
+
   // Select CPU Usage by default only when modal opens with a new process
   $: if (show && process && process.pid !== lastOpenedProcess) {
     selectedGraph = "cpu";
@@ -51,6 +59,36 @@
       selectedGraph = graph;
     }
   }
+
+  function copyToClipboard(text: string) {
+    navigator.clipboard.writeText(text);
+    contextMenu.show = false;
+  }
+
+  function handleContextMenu(
+    event: MouseEvent,
+    text: string,
+    type: "command" | "env" | "info",
+  ) {
+    event.preventDefault();
+    contextMenu = {
+      show: true,
+      x: event.clientX,
+      y: event.clientY,
+      text: text,
+    };
+  }
+
+  function closeContextMenu() {
+    contextMenu.show = false;
+  }
+
+  // Close context menu when clicking outside
+  function handleClickOutside(event: MouseEvent) {
+    if (contextMenu.show) {
+      closeContextMenu();
+    }
+  }
 </script>
 
 <Modal
@@ -59,256 +97,312 @@
   maxWidth="1000px"
   {onClose}
 >
-  {#if process}
-    <div class="modal-content">
-      <!-- Header Stats -->
-      <div class="header-stats">
-        <div class="stat-item">
-          <div class="stat-label">PID</div>
-          <div class="stat-value">{process.pid}</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-label">Status</div>
-          <div
-            class="stat-value status"
-            class:running={process.status === "Running"}
-          >
-            {process.status}
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div on:click={handleClickOutside}>
+    {#if process}
+      <div class="modal-content">
+        <!-- Header Stats -->
+        <div class="header-stats">
+          <div class="stat-item">
+            <div class="stat-label">PID</div>
+            <div class="stat-value">{process.pid}</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">Status</div>
+            <div
+              class="stat-value status"
+              class:running={process.status === "Running"}
+            >
+              {process.status}
+            </div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">CPU</div>
+            <div class="stat-value">{process.cpu_usage.toFixed(1)}%</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">Memory</div>
+            <div class="stat-value">{formatBytes(process.memory_usage)}</div>
           </div>
         </div>
-        <div class="stat-item">
-          <div class="stat-label">CPU</div>
-          <div class="stat-value">{process.cpu_usage.toFixed(1)}%</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-label">Memory</div>
-          <div class="stat-value">{formatBytes(process.memory_usage)}</div>
-        </div>
-      </div>
 
-      <!-- Resource Usage - Full Width at Top -->
-      <div class="card resource-card">
-        <div class="card-header">
-          <Fa icon={faMemory} />
-          <span>Resource Usage</span>
+        <!-- Resource Usage - Full Width at Top -->
+        <div class="card resource-card">
+          <div class="card-header">
+            <Fa icon={faMemory} />
+            <span>Resource Usage</span>
+          </div>
+          <div class="card-content">
+            <div class="resource-layout">
+              <div class="resource-metrics">
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <div
+                  class="resource-item clickable"
+                  class:active={selectedGraph === "cpu"}
+                  on:click={() => toggleGraph("cpu")}
+                >
+                  <div class="resource-header">
+                    <span>CPU Usage</span>
+                    <span class="resource-value"
+                      >{process.cpu_usage.toFixed(1)}%</span
+                    >
+                  </div>
+                  <div class="progress-bar">
+                    <div
+                      class="progress-fill"
+                      style="width: {Math.min(
+                        (process.cpu_usage / (cpuCoreCount * 100)) * 100,
+                        100,
+                      )}%"
+                      class:high={process.cpu_usage > cpuCoreCount * 50}
+                      class:critical={process.cpu_usage > cpuCoreCount * 80}
+                    ></div>
+                  </div>
+                </div>
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <div
+                  class="resource-item clickable"
+                  class:active={selectedGraph === "memory"}
+                  on:click={() => toggleGraph("memory")}
+                >
+                  <div class="resource-header">
+                    <span>Memory Usage</span>
+                  </div>
+                  <div class="memory-stats">
+                    <div>Physical: {formatBytes(process.memory_usage)}</div>
+                    <div>Virtual: {formatBytes(process.virtual_memory)}</div>
+                  </div>
+                </div>
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <div
+                  class="resource-item clickable"
+                  class:active={selectedGraph === "disk_read" ||
+                    selectedGraph === "disk_write"}
+                  on:click={() => toggleGraph("disk_read")}
+                >
+                  <div class="resource-header">
+                    <span>Disk I/O</span>
+                  </div>
+                  <div class="disk-stats">
+                    <div>Read: {formatBytes(process.disk_usage[0])}</div>
+                    <div>Written: {formatBytes(process.disk_usage[1])}</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Graph Display on the Right -->
+              {#if selectedGraph && historyData.length > 0}
+                <div class="graph-section">
+                  {#if selectedGraph === "cpu"}
+                    <TimeSeriesGraph
+                      data={historyData}
+                      metric="cpu_usage"
+                      label="CPU Usage"
+                      color="var(--blue)"
+                      height={150}
+                      maxValue={cpuCoreCount * 100}
+                    />
+                  {:else if selectedGraph === "memory"}
+                    <TimeSeriesGraph
+                      data={historyData}
+                      metric="memory_usage"
+                      label="Memory Usage"
+                      color="var(--green)"
+                      height={150}
+                    />
+                  {:else if selectedGraph === "disk_read"}
+                    <div class="disk-graphs">
+                      <TimeSeriesGraph
+                        data={historyData}
+                        metric="disk_read"
+                        label="Disk Read"
+                        color="var(--lavender)"
+                        height={120}
+                      />
+                      <TimeSeriesGraph
+                        data={historyData}
+                        metric="disk_write"
+                        label="Disk Write"
+                        color="var(--peach)"
+                        height={120}
+                      />
+                    </div>
+                  {/if}
+                </div>
+              {/if}
+            </div>
+          </div>
         </div>
-        <div class="card-content">
-          <div class="resource-layout">
-            <div class="resource-metrics">
-              <!-- svelte-ignore a11y_click_events_have_key_events -->
-              <!-- svelte-ignore a11y_no_static_element_interactions -->
-              <div
-                class="resource-item clickable"
-                class:active={selectedGraph === "cpu"}
-                on:click={() => toggleGraph("cpu")}
-              >
-                <div class="resource-header">
-                  <span>CPU Usage</span>
-                  <span class="resource-value"
-                    >{process.cpu_usage.toFixed(1)}%</span
-                  >
-                </div>
-                <div class="progress-bar">
+
+        <!-- Main Content -->
+        <div class="content-grid">
+          <!-- Left Column -->
+          <div class="content-column">
+            <!-- Process Info -->
+            <div class="card">
+              <div class="card-header">
+                <Fa icon={faMicrochip} />
+                <span>Process Information</span>
+              </div>
+              <div class="card-content">
+                <div class="info-grid">
+                  <!-- svelte-ignore a11y_no_static_element_interactions -->
                   <div
-                    class="progress-fill"
-                    style="width: {Math.min(
-                      (process.cpu_usage / (cpuCoreCount * 100)) * 100,
-                      100,
-                    )}%"
-                    class:high={process.cpu_usage > cpuCoreCount * 50}
-                    class:critical={process.cpu_usage > cpuCoreCount * 80}
-                  ></div>
-                </div>
-              </div>
-              <!-- svelte-ignore a11y_click_events_have_key_events -->
-              <!-- svelte-ignore a11y_no_static_element_interactions -->
-              <div
-                class="resource-item clickable"
-                class:active={selectedGraph === "memory"}
-                on:click={() => toggleGraph("memory")}
-              >
-                <div class="resource-header">
-                  <span>Memory Usage</span>
-                </div>
-                <div class="memory-stats">
-                  <div>Physical: {formatBytes(process.memory_usage)}</div>
-                  <div>Virtual: {formatBytes(process.virtual_memory)}</div>
-                </div>
-              </div>
-              <!-- svelte-ignore a11y_click_events_have_key_events -->
-              <!-- svelte-ignore a11y_no_static_element_interactions -->
-              <div
-                class="resource-item clickable"
-                class:active={selectedGraph === "disk_read" ||
-                  selectedGraph === "disk_write"}
-                on:click={() => toggleGraph("disk_read")}
-              >
-                <div class="resource-header">
-                  <span>Disk I/O</span>
-                </div>
-                <div class="disk-stats">
-                  <div>Read: {formatBytes(process.disk_usage[0])}</div>
-                  <div>Written: {formatBytes(process.disk_usage[1])}</div>
+                    class="info-item copyable"
+                    on:contextmenu={(e) =>
+                      handleContextMenu(e, process.name, "info")}
+                  >
+                    <span class="info-label">Name</span>
+                    <span class="info-value">{process.name}</span>
+                  </div>
+                  <!-- svelte-ignore a11y_no_static_element_interactions -->
+                  <div
+                    class="info-item copyable"
+                    on:contextmenu={(e) =>
+                      handleContextMenu(e, process.user, "info")}
+                  >
+                    <span class="info-label">User</span>
+                    <span class="info-value">{process.user}</span>
+                  </div>
+                  <!-- svelte-ignore a11y_no_static_element_interactions -->
+                  <div
+                    class="info-item copyable"
+                    on:contextmenu={(e) =>
+                      handleContextMenu(e, process.ppid.toString(), "info")}
+                  >
+                    <span class="info-label">Parent PID</span>
+                    <!-- svelte-ignore a11y_click_events_have_key_events -->
+                    <!-- svelte-ignore a11y_no_static_element_interactions -->
+                    <span
+                      class="info-value clickable"
+                      on:click={() => {
+                        const parent = processes.find(
+                          (p) => p.pid === process.ppid,
+                        );
+                        if (parent) onShowDetails(parent);
+                      }}
+                    >
+                      {process.ppid}
+                    </span>
+                  </div>
+                  <!-- svelte-ignore a11y_no_static_element_interactions -->
+                  <div
+                    class="info-item copyable"
+                    on:contextmenu={(e) =>
+                      handleContextMenu(
+                        e,
+                        process.session_id.toString(),
+                        "info",
+                      )}
+                  >
+                    <span class="info-label">Session ID</span>
+                    <span class="info-value">{process.session_id}</span>
+                  </div>
                 </div>
               </div>
             </div>
+          </div>
 
-            <!-- Graph Display on the Right -->
-            {#if selectedGraph && historyData.length > 0}
-              <div class="graph-section">
-                {#if selectedGraph === "cpu"}
-                  <TimeSeriesGraph
-                    data={historyData}
-                    metric="cpu_usage"
-                    label="CPU Usage"
-                    color="var(--blue)"
-                    height={150}
-                    maxValue={cpuCoreCount * 100}
-                  />
-                {:else if selectedGraph === "memory"}
-                  <TimeSeriesGraph
-                    data={historyData}
-                    metric="memory_usage"
-                    label="Memory Usage"
-                    color="var(--green)"
-                    height={150}
-                  />
-                {:else if selectedGraph === "disk_read"}
-                  <div class="disk-graphs">
-                    <TimeSeriesGraph
-                      data={historyData}
-                      metric="disk_read"
-                      label="Disk Read"
-                      color="var(--lavender)"
-                      height={120}
-                    />
-                    <TimeSeriesGraph
-                      data={historyData}
-                      metric="disk_write"
-                      label="Disk Write"
-                      color="var(--peach)"
-                      height={120}
-                    />
+          <!-- Right Column -->
+          <div class="content-column">
+            <!-- Command -->
+            <div class="card">
+              <div class="card-header">
+                <Fa icon={faTerminal} />
+                <span>Command</span>
+              </div>
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
+              <div
+                class="card-content copyable"
+                on:contextmenu={(e) =>
+                  handleContextMenu(
+                    e,
+                    `${process.command}\n${process.root}`,
+                    "command",
+                  )}
+              >
+                <div class="command-text">{process.command}</div>
+                <div class="path-text">{process.root}</div>
+              </div>
+            </div>
+
+            <!-- Child Processes -->
+            {#if childProcesses.length > 0}
+              <div class="card">
+                <div class="card-header">
+                  <Fa icon={faCodeFork} />
+                  <span>Child Processes ({childProcesses.length})</span>
+                </div>
+                <div class="card-content">
+                  <table class="process-table">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>PID</th>
+                        <th>CPU</th>
+                        <th>Memory</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {#each childProcesses as child}
+                        <tr
+                          class="clickable"
+                          on:click={() => onShowDetails(child)}
+                        >
+                          <td>{child.name}</td>
+                          <td>{child.pid}</td>
+                          <td>{child.cpu_usage.toFixed(1)}%</td>
+                          <td>{formatBytes(child.memory_usage)}</td>
+                        </tr>
+                      {/each}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            {/if}
+
+            <!-- Environment Variables -->
+            {#if process.environ.length > 0}
+              <div class="card">
+                <div class="card-header">
+                  <Fa icon={faList} />
+                  <span>Environment Variables</span>
+                </div>
+                <div class="card-content">
+                  <div class="env-list">
+                    {#each process.environ as env}
+                      <!-- svelte-ignore a11y_no_static_element_interactions -->
+                      <div
+                        class="env-item copyable"
+                        on:contextmenu={(e) => handleContextMenu(e, env, "env")}
+                      >
+                        {env}
+                      </div>
+                    {/each}
                   </div>
-                {/if}
+                </div>
               </div>
             {/if}
           </div>
         </div>
       </div>
+    {/if}
+  </div>
 
-      <!-- Main Content -->
-      <div class="content-grid">
-        <!-- Left Column -->
-        <div class="content-column">
-          <!-- Process Info -->
-          <div class="card">
-            <div class="card-header">
-              <Fa icon={faMicrochip} />
-              <span>Process Information</span>
-            </div>
-            <div class="card-content">
-              <div class="info-grid">
-                <div class="info-item">
-                  <span class="info-label">Name</span>
-                  <span class="info-value">{process.name}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">User</span>
-                  <span class="info-value">{process.user}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Parent PID</span>
-                  <!-- svelte-ignore a11y_click_events_have_key_events -->
-                  <!-- svelte-ignore a11y_no_static_element_interactions -->
-                  <span
-                    class="info-value clickable"
-                    on:click={() => {
-                      const parent = processes.find(
-                        (p) => p.pid === process.ppid,
-                      );
-                      if (parent) onShowDetails(parent);
-                    }}
-                  >
-                    {process.ppid}
-                  </span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Session ID</span>
-                  <span class="info-value">{process.session_id}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Right Column -->
-        <div class="content-column">
-          <!-- Command -->
-          <div class="card">
-            <div class="card-header">
-              <Fa icon={faTerminal} />
-              <span>Command</span>
-            </div>
-            <div class="card-content">
-              <div class="command-text">{process.command}</div>
-              <div class="path-text">{process.root}</div>
-            </div>
-          </div>
-
-          <!-- Child Processes -->
-          {#if childProcesses.length > 0}
-            <div class="card">
-              <div class="card-header">
-                <Fa icon={faCodeFork} />
-                <span>Child Processes ({childProcesses.length})</span>
-              </div>
-              <div class="card-content">
-                <table class="process-table">
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th>PID</th>
-                      <th>CPU</th>
-                      <th>Memory</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {#each childProcesses as child}
-                      <tr
-                        class="clickable"
-                        on:click={() => onShowDetails(child)}
-                      >
-                        <td>{child.name}</td>
-                        <td>{child.pid}</td>
-                        <td>{child.cpu_usage.toFixed(1)}%</td>
-                        <td>{formatBytes(child.memory_usage)}</td>
-                      </tr>
-                    {/each}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          {/if}
-
-          <!-- Environment Variables -->
-          {#if process.environ.length > 0}
-            <div class="card">
-              <div class="card-header">
-                <Fa icon={faList} />
-                <span>Environment Variables</span>
-              </div>
-              <div class="card-content">
-                <div class="env-list">
-                  {#each process.environ as env}
-                    <div class="env-item">{env}</div>
-                  {/each}
-                </div>
-              </div>
-            </div>
-          {/if}
-        </div>
-      </div>
+  <!-- Context Menu -->
+  {#if contextMenu.show}
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+      class="context-menu"
+      style="left: {contextMenu.x}px; top: {contextMenu.y}px;"
+      on:click|stopPropagation={() => copyToClipboard(contextMenu.text)}
+    >
+      <div class="context-menu-item">Copy</div>
     </div>
   {/if}
 </Modal>
@@ -611,6 +705,54 @@
   }
 
   .env-item:hover {
+    background: var(--surface1);
+  }
+
+  /* Copyable items */
+  .copyable {
+    cursor: context-menu;
+  }
+
+  .copyable:hover {
+    background: var(--surface1);
+  }
+
+  /* Context Menu */
+  .context-menu {
+    position: fixed;
+    z-index: 10000;
+    background: var(--surface0);
+    border: 1px solid var(--surface2);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    min-width: 120px;
+    overflow: hidden;
+    animation: fadeIn 0.15s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .context-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    cursor: pointer;
+    color: var(--text);
+    font-size: 13px;
+    transition: background 0.15s ease;
+  }
+
+  .context-menu-item:hover {
     background: var(--surface1);
   }
 
