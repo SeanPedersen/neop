@@ -11,7 +11,7 @@
   export let onShowDetails: (process: Process) => void;
   export let onKillProcess: (process: Process) => void;
 
-  function handleDoubleClick() {
+  function handleClick() {
     onShowDetails(process);
   }
 </script>
@@ -21,7 +21,7 @@
 <tr
   class:high-usage={isHighUsage}
   class:pinned={isPinned}
-  on:dblclick={handleDoubleClick}
+  on:click={handleClick}
 >
   {#each columns.filter((col) => col.visible) as column}
     <td class="truncate">
