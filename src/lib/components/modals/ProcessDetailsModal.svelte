@@ -290,25 +290,36 @@
                   <!-- svelte-ignore a11y_no_static_element_interactions -->
                   <div
                     class="info-item copyable"
-                    on:contextmenu={(e) =>
-                      handleContextMenu(e, process.ppid.toString(), "info")}
+                    on:contextmenu={(e) => {
+                      const parent = processes.find(
+                        (p) => p.pid === process.ppid,
+                      );
+                      const text = parent
+                        ? `${process.ppid} - ${parent.name}`
+                        : process.ppid.toString();
+                      handleContextMenu(e, text, "info");
+                    }}
                   >
-                    <span class="info-label">Parent PID</span>
+                    <span class="info-label">Parent Process</span>
                     {#if process.ppid === 0}
                       <span class="info-value">N/A</span>
                     {:else}
+                      {@const parent = processes.find(
+                        (p) => p.pid === process.ppid,
+                      )}
                       <!-- svelte-ignore a11y_click_events_have_key_events -->
                       <!-- svelte-ignore a11y_no_static_element_interactions -->
                       <span
-                        class="info-value clickable"
+                        class="info-value clickable parent-info"
                         on:click={() => {
-                          const parent = processes.find(
-                            (p) => p.pid === process.ppid,
-                          );
                           if (parent) onShowDetails(parent);
                         }}
                       >
-                        {process.ppid}
+                        <span class="parent-pid">{process.ppid}</span>
+                        {#if parent}
+                          <span class="parent-separator">-</span>
+                          <span class="parent-name">{parent.name}</span>
+                        {/if}
                       </span>
                     {/if}
                   </div>
@@ -586,6 +597,27 @@
 
   .info-value.clickable:hover {
     text-decoration: underline;
+  }
+
+  .parent-info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .parent-pid {
+    font-weight: 600;
+  }
+
+  .parent-separator {
+    color: var(--subtext0);
+  }
+
+  .parent-name {
+    color: var(--text);
+    font-size: 12px;
+    word-break: break-all;
   }
 
   /* Resource Usage */
