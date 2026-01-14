@@ -214,11 +214,18 @@
   }
 
   function formatBytes(bytes: number): string {
-    if (bytes === 0) return "0 B";
+    if (!bytes || bytes === 0) return "0 B";
+    if (!isFinite(bytes)) return "0 B";
+
     const k = 1024;
     const sizes = ["B", "KB", "MB", "GB", "TB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return (bytes / Math.pow(k, i)).toFixed(1) + " " + sizes[i];
+
+    // Ensure i is within valid range
+    const sizeIndex = Math.max(0, Math.min(i, sizes.length - 1));
+    const value = bytes / Math.pow(k, sizeIndex);
+
+    return value.toFixed(1) + " " + sizes[sizeIndex];
   }
 
   function handleResize() {
