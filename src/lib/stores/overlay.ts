@@ -4,10 +4,10 @@ type OverlayType =
   | "pagination"
   | "refresh"
   | "columns"
-  | "theme"
   | "searchHelp"
   | "filters"
   | "status"
+  | "settings"
   | null;
 
 function createOverlayStore() {

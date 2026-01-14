@@ -1,11 +1,10 @@
 <script lang="ts">
   import {
-    AppInfo,
     SearchBox,
     RefreshControls,
-    PaginationControls,
     ColumnToggle,
     FilterToggle,
+    SettingsMenu,
   } from "$lib/components";
   import { overlayStore } from "$lib/stores/overlay";
 
@@ -34,8 +33,15 @@
     status: { values: [], enabled: false },
   };
 
+  function changePage(page: number) {
+    if (page >= 1 && page <= totalPages) {
+      currentPage = page;
+    }
+  }
+
   $: isAnyOverlayOpen = $overlayStore !== null;
   $: activeOverlayType = $overlayStore;
+  $: showPagination = totalPages > 1;
 </script>
 
 <div class="toolbar">
@@ -50,15 +56,47 @@
 
     <div class="toolbar-spacer" class:hidden={isAnyOverlayOpen}></div>
 
-    <div class:hidden={isAnyOverlayOpen && activeOverlayType !== "pagination"}>
-      <PaginationControls
-        bind:itemsPerPage
-        bind:currentPage
-        {totalPages}
-        {totalResults}
-      />
-    </div>
-    <div class="toolbar-spacer" class:hidden={isAnyOverlayOpen}></div>
+    {#if showPagination}
+      <div
+        class:hidden={isAnyOverlayOpen && activeOverlayType !== "pagination"}
+      >
+        <div class="pagination">
+          <button
+            class="btn-page"
+            disabled={currentPage === 1}
+            on:click={() => changePage(1)}
+          >
+            ««
+          </button>
+          <button
+            class="btn-page"
+            disabled={currentPage === 1}
+            on:click={() => changePage(currentPage - 1)}
+          >
+            «
+          </button>
+          <div class="page-info">
+            <span>Page {currentPage} of {totalPages}</span>
+            <span class="results-info">({totalResults} processes)</span>
+          </div>
+          <button
+            class="btn-page"
+            disabled={currentPage === totalPages}
+            on:click={() => changePage(currentPage + 1)}
+          >
+            »
+          </button>
+          <button
+            class="btn-page"
+            disabled={currentPage === totalPages}
+            on:click={() => changePage(totalPages)}
+          >
+            »»
+          </button>
+        </div>
+      </div>
+      <div class="toolbar-spacer" class:hidden={isAnyOverlayOpen}></div>
+    {/if}
 
     <div class:hidden={isAnyOverlayOpen && activeOverlayType !== "columns"}>
       <ColumnToggle {columns} />
@@ -68,8 +106,8 @@
       <RefreshControls bind:refreshRate bind:isFrozen />
     </div>
 
-    <div class:hidden={isAnyOverlayOpen && activeOverlayType !== "theme"}>
-      <AppInfo />
+    <div class:hidden={isAnyOverlayOpen && activeOverlayType !== "settings"}>
+      <SettingsMenu bind:itemsPerPage />
     </div>
   </div>
 </div>
@@ -103,5 +141,48 @@
 
   .toolbar-spacer {
     flex: 1;
+  }
+
+  .pagination {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn-page {
+    padding: 6px 10px;
+    font-size: 12px;
+    color: var(--text);
+    background: var(--surface0);
+    border: 1px solid var(--surface1);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .btn-page:hover:not(:disabled) {
+    background: var(--surface1);
+  }
+
+  .btn-page:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .page-info {
+    font-size: 12px;
+    color: var(--subtext0);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .page-info span {
+    display: block;
+  }
+
+  .results-info {
+    color: var(--overlay0);
   }
 </style>
