@@ -1,6 +1,8 @@
 <script lang="ts">
   import type { Process, Column } from "$lib/types";
   import { createVirtualizer } from "@tanstack/svelte-virtual";
+  import Fa from "svelte-fa";
+  import { faThumbtack, faXmark } from "@fortawesome/free-solid-svg-icons";
 
   export let processes: Process[];
   export let columns: Column[];
@@ -139,18 +141,19 @@
           {/each}
           <div class="grid-cell actions-cell">
             <button
-              class="action-btn"
+              class="action-btn pin-btn"
+              class:pinned={isPinned}
               on:click|stopPropagation={() => onTogglePin(process.command)}
               title={isPinned ? "Unpin" : "Pin"}
             >
-              {isPinned ? "📌" : "📍"}
+              <Fa icon={faThumbtack} />
             </button>
             <button
-              class="action-btn"
+              class="action-btn kill-btn"
               on:click|stopPropagation={() => onKillProcess(process)}
               title="Kill Process"
             >
-              ✕
+              <Fa icon={faXmark} />
             </button>
           </div>
         </div>
@@ -307,12 +310,36 @@
     padding: 4px 8px;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 12px;
+    font-size: 14px;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .action-btn :global(svg) {
+    display: block;
     transition: all 0.2s ease;
   }
 
   .action-btn:hover {
     background: var(--surface0);
     border-color: var(--surface1);
+  }
+
+  /* Pin button styles */
+  .pin-btn.pinned :global(svg) {
+    transform: rotate(45deg);
+  }
+
+  /* Kill button styles */
+  .kill-btn:hover {
+    color: var(--red);
+    background: var(--red);
+    border-color: var(--red);
+  }
+
+  .kill-btn:hover :global(svg) {
+    color: var(--crust);
   }
 </style>
