@@ -14,8 +14,6 @@ use sysinfo::{Disk, Disks, Networks, System};
 pub struct SystemMonitor {
     /// Tracks network usage between updates
     last_network_update: (Instant, u64, u64),
-    /// Tracks disk I/O between updates (instant, read_bytes, written_bytes)
-    last_disk_io_update: (Instant, u64, u64),
 }
 
 impl SystemMonitor {
@@ -37,7 +35,6 @@ impl SystemMonitor {
 
         Self {
             last_network_update: (Instant::now(), initial_rx, initial_tx),
-            last_disk_io_update: (Instant::now(), 0, 0),
         }
     }
 
@@ -112,34 +109,18 @@ impl SystemMonitor {
 
     /// Calculates disk I/O rates by aggregating all process disk usage
     fn calculate_disk_io_stats(&mut self, sys: &System) -> (u64, u64) {
-        let (current_read, current_write) =
-            sys.processes()
-                .values()
-                .fold((0, 0), |(total_read, total_write), process| {
-                    let disk_usage = process.disk_usage();
-                    (
-                        total_read + disk_usage.total_read_bytes,
-                        total_write + disk_usage.total_written_bytes,
-                    )
-                });
-
-        let elapsed = self.last_disk_io_update.0.elapsed().as_secs_f64();
-
-        // Handle potential counter resets or overflow by checking if current values are less than previous
-        let read_rate = if elapsed > 0.0 && current_read >= self.last_disk_io_update.1 {
-            ((current_read - self.last_disk_io_update.1) as f64 / elapsed) as u64
-        } else {
-            0
-        };
-
-        let write_rate = if elapsed > 0.0 && current_write >= self.last_disk_io_update.2 {
-            ((current_write - self.last_disk_io_update.2) as f64 / elapsed) as u64
-        } else {
-            0
-        };
-
-        self.last_disk_io_update = (Instant::now(), current_read, current_write);
-        (read_rate, write_rate)
+        // Sum the per-process disk I/O rates (bytes since last refresh)
+        // This gives us the current system-wide disk I/O rate that matches
+        // what's displayed in the process table
+        sys.processes()
+            .values()
+            .fold((0, 0), |(total_read, total_write), process| {
+                let disk_usage = process.disk_usage();
+                (
+                    total_read + disk_usage.read_bytes,
+                    total_write + disk_usage.written_bytes,
+                )
+            })
     }
 
     /// Calculates disk usage statistics and returns `(total, used, free)`.
