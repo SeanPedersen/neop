@@ -57,6 +57,7 @@
   // Throttled filtering to reduce CPU usage
   let lastFilterTerm = "";
   let lastFilterState = JSON.stringify(filters);
+  let filterJustChanged = false;
 
   const debouncedFilter = debounce(() => {
     const hasFilters = Object.values(filters).some((f) => f.enabled);
@@ -80,6 +81,11 @@
       lastProcessCount = processes.length;
       lastFilterTerm = searchTerm;
       lastFilterState = JSON.stringify(filters);
+
+      // Set flag when filter state actually changes
+      if (filterStateChanged) {
+        filterJustChanged = true;
+      }
 
       // Skip debounce on initial load when there are no filters
       if (!hasFilters && !hasSearchTerm) {
@@ -129,12 +135,18 @@
   $: {
     const pageChanged = lastPage !== currentPage;
     const itemsPerPageChanged = lastItemsPerPage !== itemsPerPage;
-    const needsNewSlice = pageChanged || itemsPerPageChanged;
+    const needsNewSlice =
+      pageChanged || itemsPerPageChanged || filterJustChanged;
 
     if (needsNewSlice || paginatedProcesses.length === 0) {
       lastPage = currentPage;
       lastItemsPerPage = itemsPerPage;
       lastSortedLength = cachedSortedProcesses.length;
+
+      // Reset the filter flag after we've acted on it
+      if (filterJustChanged) {
+        filterJustChanged = false;
+      }
 
       paginatedProcesses = cachedSortedProcesses.slice(
         (currentPage - 1) * itemsPerPage,
