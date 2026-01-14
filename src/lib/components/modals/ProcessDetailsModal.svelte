@@ -2,6 +2,7 @@
   import { Modal } from "$lib/components";
   import { formatBytes } from "$lib/utils";
   import type { Process, ProcessHistoryDataPoint } from "$lib/types";
+  import type { ProcessResourceAccumulator } from "$lib/stores/systemHistory";
   import { processHistoryStore } from "$lib/stores/processHistory";
   import TimeSeriesGraph from "$lib/components/stats/TimeSeriesGraph.svelte";
   import Fa from "svelte-fa";
@@ -18,6 +19,8 @@
   export let process: Process | null = null;
   export let onClose: () => void;
   export let processes: Process[] = [];
+  export let processAccumulators: Map<string, ProcessResourceAccumulator> =
+    new Map();
   export let onShowDetails: (process: Process) => void;
   export let cpuCoreCount: number = 1;
 
@@ -25,6 +28,121 @@
   $: childProcesses = process
     ? processes.filter((p) => p.ppid === process.pid)
     : [];
+
+  // Build a comprehensive map of all processes (live and dead) by composite key
+  $: allProcessesByKey = new Map<
+    string,
+    { name: string; pid: number; startTime: number; isLive: boolean }
+  >([
+    // Add live processes
+    ...processes.map(
+      (p) =>
+        [
+          `${p.pid}-${p.start_time}`,
+          { name: p.name, pid: p.pid, startTime: p.start_time, isLive: true },
+        ] as [
+          string,
+          { name: string; pid: number; startTime: number; isLive: boolean },
+        ],
+    ),
+    // Add dead processes from accumulator
+    ...Array.from(processAccumulators.entries())
+      .filter(([_, acc]) => acc.status === "Dead")
+      .map(
+        ([key, acc]) =>
+          [
+            key,
+            {
+              name: acc.name,
+              pid: acc.pid,
+              startTime: acc.startTime,
+              isLive: false,
+            },
+          ] as [
+            string,
+            { name: string; pid: number; startTime: number; isLive: boolean },
+          ],
+      ),
+  ]);
+
+  // Function to find parent process using composite key (PID + start_time)
+  function findParentProcess(
+    currentProcess: Process | null,
+    allProcessesByKey: Map<
+      string,
+      { name: string; pid: number; startTime: number; isLive: boolean }
+    >,
+    processAccumulators: Map<string, ProcessResourceAccumulator>,
+  ): { name: string; pid: number; startTime: number } | null {
+    if (!currentProcess || currentProcess.ppid === 0) return null;
+
+    // Get the parent's start_time from the current process's accumulator entry
+    const currentKey = `${currentProcess.pid}-${currentProcess.start_time}`;
+    const currentAccumulator = processAccumulators.get(currentKey);
+
+    if (currentAccumulator) {
+      // Special case: PID 1 (launchd/init) has start_time 0
+      const parentKey =
+        currentAccumulator.ppid === 1
+          ? "1-0"
+          : `${currentAccumulator.ppid}-${currentAccumulator.parentStartTime}`;
+
+      const parentInfo = allProcessesByKey.get(parentKey);
+      if (parentInfo) {
+        return {
+          name: parentInfo.name,
+          pid: parentInfo.pid,
+          startTime: parentInfo.startTime,
+        };
+      }
+    }
+
+    return null;
+  }
+
+  $: parentProcess =
+    process && processAccumulators && allProcessesByKey
+      ? findParentProcess(process, allProcessesByKey, processAccumulators)
+      : null;
+
+  function handleShowParentDetails() {
+    if (!parentProcess) return;
+
+    // Try to find the parent in live processes using composite key
+    const liveParent = processes.find(
+      (p) =>
+        p.pid === parentProcess.pid && p.start_time === parentProcess.startTime,
+    );
+    if (liveParent) {
+      onShowDetails(liveParent);
+      return;
+    }
+
+    // If not live, reconstruct a dead Process object from the accumulator using composite key
+    const parentKey = `${parentProcess.pid}-${parentProcess.startTime}`;
+    const accumulator = processAccumulators.get(parentKey);
+    if (accumulator) {
+      const deadParent: Process = {
+        pid: accumulator.pid,
+        ppid: accumulator.ppid,
+        name: accumulator.name,
+        cpu_usage: 0,
+        memory_usage: 0,
+        status: "Dead",
+        user: accumulator.user,
+        command: accumulator.command,
+        threads: 0,
+        environ: [],
+        root: "",
+        virtual_memory: 0,
+        start_time: accumulator.startTime,
+        run_time: 0,
+        disk_usage: [0, 0],
+        session_id: 0,
+      };
+      onShowDetails(deadParent);
+    }
+  }
 
   // Create a derived store that gets the history for the current process
   $: historyStore = derived(processHistoryStore, ($store) => {
@@ -291,11 +409,8 @@
                   <div
                     class="info-item copyable"
                     on:contextmenu={(e) => {
-                      const parent = processes.find(
-                        (p) => p.pid === process.ppid,
-                      );
-                      const text = parent
-                        ? `${process.ppid} - ${parent.name}`
+                      const text = parentProcess
+                        ? `${parentProcess.pid} - ${parentProcess.name}`
                         : process.ppid.toString();
                       handleContextMenu(e, text, "info");
                     }}
@@ -303,24 +418,19 @@
                     <span class="info-label">Parent Process</span>
                     {#if process.ppid === 0}
                       <span class="info-value">N/A</span>
-                    {:else}
-                      {@const parent = processes.find(
-                        (p) => p.pid === process.ppid,
-                      )}
+                    {:else if parentProcess}
                       <!-- svelte-ignore a11y_click_events_have_key_events -->
                       <!-- svelte-ignore a11y_no_static_element_interactions -->
                       <span
                         class="info-value clickable parent-info"
-                        on:click={() => {
-                          if (parent) onShowDetails(parent);
-                        }}
+                        on:click={handleShowParentDetails}
                       >
-                        <span class="parent-pid">{process.ppid}</span>
-                        {#if parent}
-                          <span class="parent-separator">-</span>
-                          <span class="parent-name">{parent.name}</span>
-                        {/if}
+                        <span class="parent-pid">{parentProcess.pid}</span>
+                        <span class="parent-separator">-</span>
+                        <span class="parent-name">{parentProcess.name}</span>
                       </span>
+                    {:else}
+                      <span class="info-value">{process.ppid}</span>
                     {/if}
                   </div>
                   <!-- svelte-ignore a11y_no_static_element_interactions -->

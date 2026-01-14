@@ -9,7 +9,12 @@
     ProcessDetailsModal,
     KillProcessModal,
   } from "$lib/components/index";
-  import { themeStore, settingsStore, processStore } from "$lib/stores/index";
+  import {
+    themeStore,
+    settingsStore,
+    processStore,
+    systemHistoryStore,
+  } from "$lib/stores/index";
   import { column_definitions } from "$lib/definitions/columns";
   import { filterProcesses, sortProcesses } from "$lib/utils";
   import type { Process } from "$lib/types";
@@ -90,7 +95,6 @@
       // Skip debounce on initial load when there are no filters
       if (!hasFilters && !hasSearchTerm) {
         cachedFilteredProcesses = processes;
-        console.log("[Filter] Immediate filter, processes:", processes.length);
       } else {
         debouncedFilter();
       }
@@ -111,13 +115,6 @@
         cachedFilteredProcesses,
         sortConfig,
         pinnedProcesses,
-      );
-      console.log(
-        "[Sort] Sorted processes:",
-        cachedSortedProcesses.length,
-        "by",
-        sortConfig.field,
-        sortConfig.direction,
       );
     } else if (cachedFilteredProcesses.length === 0) {
       // Clear sorted list when there are no filtered processes
@@ -152,45 +149,11 @@
         (currentPage - 1) * itemsPerPage,
         currentPage * itemsPerPage,
       );
-
-      console.log(
-        "[Paginate] New slice, paginated:",
-        paginatedProcesses.length,
-        "from",
-        cachedSortedProcesses.length,
-        "currentPage:",
-        currentPage,
-        "itemsPerPage:",
-        itemsPerPage,
-      );
-      if (paginatedProcesses.length > 0) {
-        console.log(
-          "[Paginate] First 3 processes CPU:",
-          paginatedProcesses[0]?.cpu_usage,
-          paginatedProcesses[1]?.cpu_usage,
-          paginatedProcesses[2]?.cpu_usage,
-        );
-      }
     } else {
       // Update existing array in place - this preserves the reference
       const start = (currentPage - 1) * itemsPerPage;
       const end = start + itemsPerPage;
       const newSlice = cachedSortedProcesses.slice(start, end);
-
-      console.log(
-        "[Paginate] In-place update, from",
-        paginatedProcesses.length,
-        "to",
-        newSlice.length,
-      );
-      if (newSlice.length > 0) {
-        console.log(
-          "[Paginate] In-place first 3 CPU:",
-          newSlice[0]?.cpu_usage,
-          newSlice[1]?.cpu_usage,
-          newSlice[2]?.cpu_usage,
-        );
-      }
 
       // Adjust array length if needed
       paginatedProcesses.length = newSlice.length;
@@ -232,17 +195,14 @@
     try {
       // First fetch - will have 0% CPU for all processes
       await processStore.getProcesses();
-      console.log("[Mount] First fetch complete");
 
       // Wait 100ms then fetch again to get real CPU values
       await new Promise((resolve) => setTimeout(resolve, 100));
       await processStore.getProcesses();
-      console.log("[Mount] Second fetch complete with real CPU data");
     } catch (error) {
       console.error("Failed to load processes:", error);
     } finally {
       processStore.setIsLoading(false);
-      console.log("[Mount] isLoading = false, showing UI");
     }
   });
 
@@ -300,6 +260,7 @@
   show={showInfoModal}
   process={selectedProcess}
   {processes}
+  processAccumulators={$systemHistoryStore.processAccumulators}
   cpuCoreCount={systemStats?.cpu_usage?.length || 1}
   onClose={processStore.closeProcessDetails}
   onShowDetails={processStore.showProcessDetails}

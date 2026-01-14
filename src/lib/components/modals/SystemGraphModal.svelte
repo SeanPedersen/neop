@@ -174,7 +174,7 @@
       // Create a dead process object for display with saved information
       const deadProcess: Process = {
         pid: proc.pid,
-        ppid: 0,
+        ppid: proc.ppid,
         name: proc.name,
         cpu_usage: 0,
         memory_usage: 0,

@@ -13,6 +13,8 @@ export interface SystemHistoryDataPoint {
 
 export interface ProcessResourceAccumulator {
   pid: number;
+  ppid: number;
+  parentStartTime: number; // Parent's start_time for composite key lookup
   name: string;
   command: string;
   user: string;
@@ -67,6 +69,27 @@ function createSystemHistoryStore() {
         const key = `${process.pid}-${process.start_time}`;
         currentProcessKeys.add(key);
 
+        // Find parent process to get its start_time
+        // First try current processes
+        let parentStartTime = 0;
+        const parentProcess = processes.find((p) => p.pid === process.ppid);
+
+        if (parentProcess) {
+          parentStartTime = parentProcess.start_time;
+        } else if (process.ppid !== 0 && process.ppid !== 1) {
+          // Parent not in current processes, check if we have it in the accumulator
+          // Skip PID 1 (launchd/init) as it's special and has start_time 0
+          // Find the most recent accumulator entry with matching ppid
+          const existingParents = Array.from(processAccumulators.values())
+            .filter((acc) => acc.pid === process.ppid)
+            .sort((a, b) => b.lastSeen - a.lastSeen);
+
+          if (existingParents.length > 0) {
+            parentStartTime = existingParents[0].startTime;
+          }
+        }
+        // For ppid === 1 (launchd), parentStartTime stays 0 which is correct
+
         const existing = processAccumulators.get(key);
         if (existing) {
           existing.totalCpuUsage += process.cpu_usage;
@@ -79,9 +102,14 @@ function createSystemHistoryStore() {
           existing.sampleCount += 1;
           existing.lastSeen = now;
           existing.status = process.status;
+          // Update parent info in case it changed (though unlikely)
+          existing.ppid = process.ppid;
+          existing.parentStartTime = parentStartTime;
         } else {
           processAccumulators.set(key, {
             pid: process.pid,
+            ppid: process.ppid,
+            parentStartTime: parentStartTime,
             name: process.name,
             command: process.command,
             user: process.user,
