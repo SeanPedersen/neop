@@ -54,10 +54,25 @@
     }
   }
 
-  const graphConfigs = {
+  const graphConfigs: {
+    [key: string]: {
+      title: string;
+      showSingle: boolean;
+      metric?:
+        | "cpu_average"
+        | "memory_used"
+        | "disk_io_read_bytes"
+        | "disk_io_write_bytes"
+        | "network_rx_bytes"
+        | "network_tx_bytes";
+      label?: string;
+      color?: string;
+      maxValue?: number | null;
+    };
+  } = {
     cpu: {
       title: "System CPU Usage",
-      metric: "cpu_average" as const,
+      metric: "cpu_average",
       label: "CPU Usage",
       color: "var(--blue)",
       maxValue: 100,
@@ -65,7 +80,7 @@
     },
     memory: {
       title: "System Memory Usage",
-      metric: "memory_used" as const,
+      metric: "memory_used",
       label: "Memory Usage",
       color: "var(--green)",
       maxValue: memoryTotal || null,
@@ -73,7 +88,7 @@
     },
     network_rx: {
       title: "Network Received",
-      metric: "network_rx_bytes" as const,
+      metric: "network_rx_bytes",
       label: "Network RX",
       color: "var(--lavender)",
       maxValue: null,
@@ -81,7 +96,7 @@
     },
     network_tx: {
       title: "Network Transmitted",
-      metric: "network_tx_bytes" as const,
+      metric: "network_tx_bytes",
       label: "Network TX",
       color: "var(--peach)",
       maxValue: null,
@@ -137,14 +152,14 @@
     <div class="graph-modal-content">
       <div class="content-layout">
         <div class="graph-area">
-          {#if currentConfig.showSingle}
+          {#if currentConfig.showSingle && currentConfig.metric && currentConfig.label && currentConfig.color !== undefined}
             <TimeSeriesGraph
               data={historyData}
               metric={currentConfig.metric}
               label={currentConfig.label}
               color={currentConfig.color}
               height={300}
-              maxValue={currentConfig.maxValue}
+              maxValue={currentConfig.maxValue ?? null}
             />
           {:else if graphType === "disk_io"}
             <div class="dual-graphs">
