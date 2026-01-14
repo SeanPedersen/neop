@@ -17,6 +17,7 @@ export const APP_INFO = {
 export const ITEMS_PER_PAGE_OPTIONS = [15, 25, 50, 100, 250, 500, 1000, 5000];
 
 export const REFRESH_RATE_OPTIONS = [
+  { value: 1000, label: "1s" },
   { value: 2000, label: "2s" },
   { value: 3000, label: "3s" },
   { value: 5000, label: "5s" },
