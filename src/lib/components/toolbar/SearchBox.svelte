@@ -197,6 +197,10 @@
       class:has-search={hasActiveSearch}
       on:focus={handleFocus}
       on:blur={handleBlur}
+      autocomplete="off"
+      autocorrect="off"
+      autocapitalize="off"
+      spellcheck="false"
     />
     {#if searchTerm}
       <button class="btn-clear" on:click={() => (searchTerm = "")}>
@@ -222,6 +226,9 @@
             class="overlay-search-input"
             on:blur={handleBlur}
             autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck="false"
           />
           {#if searchTerm}
             <button
