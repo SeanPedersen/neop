@@ -1,8 +1,11 @@
 <script lang="ts">
   import { Modal } from "$lib/components";
   import { formatBytes } from "$lib/utils";
-  import type { Process } from "$lib/types";
+  import type { Process, ProcessHistoryDataPoint } from "$lib/types";
+  import { processHistoryStore } from "$lib/stores/processHistory";
+  import TimeSeriesGraph from "$lib/components/stats/TimeSeriesGraph.svelte";
   import Fa from "svelte-fa";
+  import { derived } from "svelte/store";
   import {
     faMemory,
     faMicrochip,
@@ -20,6 +23,33 @@
   $: childProcesses = process
     ? processes.filter((p) => p.ppid === process.pid)
     : [];
+
+  // Create a derived store that gets the history for the current process
+  $: historyStore = derived(processHistoryStore, ($store) => {
+    return process ? $store.histories.get(process.pid) || [] : [];
+  });
+
+  $: historyData = $historyStore;
+
+  let selectedGraph: "cpu" | "memory" | "disk_read" | "disk_write" | null =
+    null;
+  let lastOpenedProcess: number | null = null;
+
+  // Select CPU Usage by default only when modal opens with a new process
+  $: if (show && process && process.pid !== lastOpenedProcess) {
+    selectedGraph = "cpu";
+    lastOpenedProcess = process.pid;
+  } else if (!show) {
+    lastOpenedProcess = null;
+  }
+
+  function toggleGraph(graph: "cpu" | "memory" | "disk_read" | "disk_write") {
+    if (selectedGraph === graph) {
+      selectedGraph = null;
+    } else {
+      selectedGraph = graph;
+    }
+  }
 </script>
 
 <Modal
@@ -52,6 +82,114 @@
         <div class="stat-item">
           <div class="stat-label">Memory</div>
           <div class="stat-value">{formatBytes(process.memory_usage)}</div>
+        </div>
+      </div>
+
+      <!-- Resource Usage - Full Width at Top -->
+      <div class="card resource-card">
+        <div class="card-header">
+          <Fa icon={faMemory} />
+          <span>Resource Usage</span>
+        </div>
+        <div class="card-content">
+          <div class="resource-layout">
+            <div class="resource-metrics">
+              <!-- svelte-ignore a11y_click_events_have_key_events -->
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
+              <div
+                class="resource-item clickable"
+                class:active={selectedGraph === "cpu"}
+                on:click={() => toggleGraph("cpu")}
+              >
+                <div class="resource-header">
+                  <span>CPU Usage</span>
+                  <span class="resource-value"
+                    >{process.cpu_usage.toFixed(1)}%</span
+                  >
+                </div>
+                <div class="progress-bar">
+                  <div
+                    class="progress-fill"
+                    style="width: {process.cpu_usage}%"
+                    class:high={process.cpu_usage > 50}
+                    class:critical={process.cpu_usage > 80}
+                  ></div>
+                </div>
+              </div>
+              <!-- svelte-ignore a11y_click_events_have_key_events -->
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
+              <div
+                class="resource-item clickable"
+                class:active={selectedGraph === "memory"}
+                on:click={() => toggleGraph("memory")}
+              >
+                <div class="resource-header">
+                  <span>Memory Usage</span>
+                </div>
+                <div class="memory-stats">
+                  <div>Physical: {formatBytes(process.memory_usage)}</div>
+                  <div>Virtual: {formatBytes(process.virtual_memory)}</div>
+                </div>
+              </div>
+              <!-- svelte-ignore a11y_click_events_have_key_events -->
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
+              <div
+                class="resource-item clickable"
+                class:active={selectedGraph === "disk_read" ||
+                  selectedGraph === "disk_write"}
+                on:click={() => toggleGraph("disk_read")}
+              >
+                <div class="resource-header">
+                  <span>Disk I/O</span>
+                </div>
+                <div class="disk-stats">
+                  <div>Read: {formatBytes(process.disk_usage[0])}</div>
+                  <div>Written: {formatBytes(process.disk_usage[1])}</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Graph Display on the Right -->
+            {#if selectedGraph && historyData.length > 0}
+              <div class="graph-section">
+                {#if selectedGraph === "cpu"}
+                  <TimeSeriesGraph
+                    data={historyData}
+                    metric="cpu_usage"
+                    label="CPU Usage"
+                    color="var(--blue)"
+                    height={150}
+                    maxValue={100}
+                  />
+                {:else if selectedGraph === "memory"}
+                  <TimeSeriesGraph
+                    data={historyData}
+                    metric="memory_usage"
+                    label="Memory Usage"
+                    color="var(--green)"
+                    height={150}
+                  />
+                {:else if selectedGraph === "disk_read"}
+                  <div class="disk-graphs">
+                    <TimeSeriesGraph
+                      data={historyData}
+                      metric="disk_read"
+                      label="Disk Read"
+                      color="var(--lavender)"
+                      height={120}
+                    />
+                    <TimeSeriesGraph
+                      data={historyData}
+                      metric="disk_write"
+                      label="Disk Write"
+                      color="var(--peach)"
+                      height={120}
+                    />
+                  </div>
+                {/if}
+              </div>
+            {/if}
+          </div>
         </div>
       </div>
 
@@ -94,52 +232,6 @@
                 <div class="info-item">
                   <span class="info-label">Session ID</span>
                   <span class="info-value">{process.session_id}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Resource Usage -->
-          <div class="card">
-            <div class="card-header">
-              <Fa icon={faMemory} />
-              <span>Resource Usage</span>
-            </div>
-            <div class="card-content">
-              <div class="resource-grid">
-                <div class="resource-item">
-                  <div class="resource-header">
-                    <span>CPU Usage</span>
-                    <span class="resource-value"
-                      >{process.cpu_usage.toFixed(1)}%</span
-                    >
-                  </div>
-                  <div class="progress-bar">
-                    <div
-                      class="progress-fill"
-                      style="width: {process.cpu_usage}%"
-                      class:high={process.cpu_usage > 50}
-                      class:critical={process.cpu_usage > 80}
-                    ></div>
-                  </div>
-                </div>
-                <div class="resource-item">
-                  <div class="resource-header">
-                    <span>Memory Usage</span>
-                  </div>
-                  <div class="memory-stats">
-                    <div>Physical: {formatBytes(process.memory_usage)}</div>
-                    <div>Virtual: {formatBytes(process.virtual_memory)}</div>
-                  </div>
-                </div>
-                <div class="resource-item">
-                  <div class="resource-header">
-                    <span>Disk I/O</span>
-                  </div>
-                  <div class="disk-stats">
-                    <div>Read: {formatBytes(process.disk_usage[0])}</div>
-                    <div>Written: {formatBytes(process.disk_usage[1])}</div>
-                  </div>
                 </div>
               </div>
             </div>
@@ -337,6 +429,23 @@
   }
 
   /* Resource Usage */
+  .resource-card {
+    width: 100%;
+  }
+
+  .resource-layout {
+    display: grid;
+    grid-template-columns: minmax(250px, 0.3fr) minmax(400px, 0.7fr);
+    gap: 24px;
+    align-items: start;
+  }
+
+  .resource-metrics {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
   .resource-grid {
     display: flex;
     flex-direction: column;
@@ -347,6 +456,22 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
+    padding: 8px;
+    border-radius: 6px;
+    transition: background 0.2s ease;
+  }
+
+  .resource-item.clickable {
+    cursor: pointer;
+  }
+
+  .resource-item.clickable:hover {
+    background: var(--surface1);
+  }
+
+  .resource-item.clickable.active {
+    background: var(--surface1);
+    border: 1px solid var(--blue);
   }
 
   .resource-header {
@@ -390,6 +515,31 @@
     grid-template-columns: 1fr 1fr;
     gap: 8px;
     color: var(--text);
+  }
+
+  /* Graph Section */
+  .graph-section {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .disk-graphs {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .graph-with-title {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .graph-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    padding-left: 4px;
   }
 
   /* Command and Path */
@@ -509,6 +659,10 @@
 
     .header-stats {
       grid-template-columns: repeat(2, 1fr);
+    }
+
+    .resource-layout {
+      grid-template-columns: 1fr;
     }
   }
 </style>

@@ -1,6 +1,7 @@
 import { writable, derived } from "svelte/store";
 import type { Process, SystemStats } from "$lib/types";
 import { invoke } from "@tauri-apps/api/core";
+import { processHistoryStore } from "./processHistory";
 
 interface ProcessStore {
   processes: Process[];
@@ -60,6 +61,9 @@ function createProcessStore() {
           updatedSelectedProcess =
             result[0].find((p) => p.pid === state.selectedProcessPid) || null;
         }
+
+        // Add data points to history store
+        processHistoryStore.addDataPoints(result[0]);
 
         return {
           ...state,

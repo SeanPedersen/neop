@@ -115,3 +115,16 @@ export interface SortConfig {
   field: keyof Process;
   direction: "asc" | "desc";
 }
+
+export interface ProcessHistoryDataPoint {
+  timestamp: number;
+  cpu_usage: number;
+  memory_usage: number;
+  disk_read: number;
+  disk_write: number;
+}
+
+export interface ProcessHistory {
+  pid: number;
+  dataPoints: ProcessHistoryDataPoint[];
+}
