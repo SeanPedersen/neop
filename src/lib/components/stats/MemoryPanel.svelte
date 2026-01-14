@@ -6,11 +6,18 @@
   export let memoryTotal: number;
   export let memoryUsed: number;
   export let memoryFree: number;
+  export let onGraphClick: (() => void) | undefined = undefined;
 
   $: memoryPercentage = (memoryUsed / memoryTotal) * 100;
 </script>
 
-<div class="stat-panel">
+<!-- svelte-ignore a11y_click_events_have_key_events -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div
+  class="stat-panel"
+  class:clickable={!!onGraphClick}
+  on:click={onGraphClick}
+>
   <PanelHeader
     icon={faMemory}
     title="Memory"
@@ -40,6 +47,10 @@
     padding: 0.75rem;
     display: flex;
     flex-direction: column;
+  }
+
+  .stat-panel.clickable {
+    cursor: pointer;
   }
 
   .stats-content {

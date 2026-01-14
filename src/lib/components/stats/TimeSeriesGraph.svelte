@@ -1,9 +1,20 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import type { ProcessHistoryDataPoint } from "$lib/types";
+  import type { SystemHistoryDataPoint } from "$lib/stores/systemHistory";
 
-  export let data: ProcessHistoryDataPoint[] = [];
-  export let metric: "cpu_usage" | "memory_usage" | "disk_read" | "disk_write";
+  export let data: ProcessHistoryDataPoint[] | SystemHistoryDataPoint[] = [];
+  export let metric:
+    | "cpu_usage"
+    | "cpu_average"
+    | "memory_usage"
+    | "memory_used"
+    | "disk_read"
+    | "disk_write"
+    | "disk_io_read_bytes"
+    | "disk_io_write_bytes"
+    | "network_rx_bytes"
+    | "network_tx_bytes";
   export let label: string = "";
   export let color: string = "#89b4fa"; // Default blue
   export let height: number = 150;
@@ -204,13 +215,21 @@
   }
 
   function formatValue(value: number): string {
-    if (metric === "cpu_usage") {
+    if (metric === "cpu_usage" || metric === "cpu_average") {
       return value.toFixed(1) + "%";
-    } else if (metric === "memory_usage") {
-      return formatBytes(value);
-    } else {
+    } else if (
+      metric === "memory_usage" ||
+      metric === "memory_used" ||
+      metric === "disk_read" ||
+      metric === "disk_write" ||
+      metric === "disk_io_read_bytes" ||
+      metric === "disk_io_write_bytes" ||
+      metric === "network_rx_bytes" ||
+      metric === "network_tx_bytes"
+    ) {
       return formatBytes(value);
     }
+    return value.toFixed(1);
   }
 
   function formatBytes(bytes: number): string {

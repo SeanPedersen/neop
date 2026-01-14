@@ -8,19 +8,45 @@
     NetworkPanel,
     DiskIOPanel,
   } from "$lib/components";
+  import SystemGraphModal from "$lib/components/modals/SystemGraphModal.svelte";
 
   export let systemStats: SystemStats | null = null;
+
+  let showGraphModal = false;
+  let graphType:
+    | "cpu"
+    | "memory"
+    | "network_rx"
+    | "network_tx"
+    | "disk_io"
+    | null = null;
+
+  function openGraph(
+    type: "cpu" | "memory" | "network_rx" | "network_tx" | "disk_io",
+  ) {
+    graphType = type;
+    showGraphModal = true;
+  }
+
+  function closeGraph() {
+    showGraphModal = false;
+    graphType = null;
+  }
 </script>
 
 <div class="dashboard-stats">
   {#if systemStats}
     <div class="stats-layout">
-      <CpuPanel cpuUsage={systemStats.cpu_usage} />
+      <CpuPanel
+        cpuUsage={systemStats.cpu_usage}
+        onGraphClick={() => openGraph("cpu")}
+      />
 
       <MemoryPanel
         memoryTotal={systemStats.memory_total}
         memoryUsed={systemStats.memory_used}
         memoryFree={systemStats.memory_free}
+        onGraphClick={() => openGraph("memory")}
       />
 
       <NetworkPanel
@@ -31,6 +57,7 @@
       <DiskIOPanel
         diskIoReadBytes={systemStats.disk_io_read_bytes}
         diskIoWriteBytes={systemStats.disk_io_write_bytes}
+        onGraphClick={() => openGraph("disk_io")}
       />
 
       <StoragePanel
@@ -43,6 +70,13 @@
     </div>
   {/if}
 </div>
+
+<SystemGraphModal
+  show={showGraphModal}
+  {graphType}
+  onClose={closeGraph}
+  memoryTotal={systemStats?.memory_total}
+/>
 
 <style>
   .dashboard-stats {

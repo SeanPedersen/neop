@@ -4,13 +4,20 @@
   import { formatPercentage } from "$lib/utils";
 
   export let cpuUsage: number[];
+  export let onGraphClick: (() => void) | undefined = undefined;
 
   $: averageUsage = formatPercentage(
     cpuUsage.reduce((a, b) => a + b, 0) / cpuUsage.length,
   );
 </script>
 
-<div class="stat-panel">
+<!-- svelte-ignore a11y_click_events_have_key_events -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div
+  class="stat-panel"
+  class:clickable={!!onGraphClick}
+  on:click={onGraphClick}
+>
   <PanelHeader icon={faMicrochip} title="CPU Usage" usageValue={averageUsage} />
   <div class="stats-content cpu-grid">
     {#each cpuUsage as usage, i}
@@ -35,6 +42,10 @@
     padding: 0.75rem;
     display: flex;
     flex-direction: column;
+  }
+
+  .stat-panel.clickable {
+    cursor: pointer;
   }
 
   .stats-content {
